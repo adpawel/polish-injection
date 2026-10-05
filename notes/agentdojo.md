@@ -24,7 +24,7 @@ python -m agentdojo.scripts.benchmark -s workspace -ut user_task_0 -it injection
   by us (separate `--logdir` + `-f`).
 - OpenAI-compatible APIs (DeepSeek, vLLM): `--model OPENAI_COMPATIBLE --model-id <id>` + env vars
   `OPENAI_COMPATIBLE_BASE_URL`, `OPENAI_COMPATIBLE_API_KEY`. AgentDojo sends the `developer` role,
-  which DeepSeek does not accept → use `scripts/run_agentdojo.py` (compatibility fix, not yet tested with DeepSeek).
+  which DeepSeek does not accept (we no longer use DeepSeek; the HF router accepts it).
 - The `LOCAL` provider does tool calling via the prompt (`<function=name>{json}</function>` + regex),
   while API models use native tool calling. For model comparability we must decide which mechanism to use.
 

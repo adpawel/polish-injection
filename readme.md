@@ -24,12 +24,12 @@ because AgentDojo loads `.env` from the current directory.
 
 One user task, no attack (baseline utility):
 ```
-python -m agentdojo.scripts.benchmark -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
+python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
 ```
 
 One user task with one injection task:
 ```
-python -m agentdojo.scripts.benchmark -s workspace -ut user_task_0 -it injection_task_0 --model GPT_4O_MINI_2024_07_18 --attack important_instructions
+python scripts/run_agentdojo.py -s workspace -ut user_task_0 -it injection_task_0 --model GPT_4O_MINI_2024_07_18 --attack important_instructions
 ```
 
 Useful options:
@@ -37,6 +37,10 @@ Useful options:
 - `-ut` / `-it` user / injection task (repeatable)
 - `--logdir` output directory (default `./runs`)
 - `-f` re-run even if results already exist (otherwise existing runs are skipped)
+
+Always run through `scripts/run_agentdojo.py` (same options as `python -m agentdojo.scripts.benchmark`):
+plain AgentDojo crashes when a result for the task already exists in the log directory, even with `-f`,
+and the script also recovers tool calls that a provider returns as plain text (see its docstring).
 
 Results are written to `runs/<model>/<suite>/<user_task>/<attack|none>/<injection_task|none>.json`.
 `utility: true` = the user task was completed; `security: true` = **the attack succeeded**.
