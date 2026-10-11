@@ -9,7 +9,8 @@
    here and every conversion is logged ("recovered text tool call"), so it can be counted.
 3. Output length cap: AgentDojo sets no `max_tokens`, so a model stuck in a loop (seen with Bielik
    on vLLM) generates until the context is full, which takes many minutes. Set the
-   `AGENTDOJO_MAX_TOKENS` environment variable to cap every completion.
+   `AGENTDOJO_MAX_TOKENS` environment variable to cap every completion. Every completion cut by the cap is
+   logged ("completion cut by max_tokens").
 4. Reasoning blocks: `<think>...</think>` is removed from answers and each removal is logged
    ("stripped reasoning block").
 5. System role: AgentDojo sends the system prompt with role `developer`, which some servers reject
@@ -120,7 +121,7 @@ def _chat_completion_request_with_max_tokens(
     client, model, messages, tools, reasoning_effort, temperature=0.0, stop=NOT_GIVEN
 ):
     """Same as `openai_llm.chat_completion_request`, plus the optional `max_tokens` cap and `stop`."""
-    return client.chat.completions.create(
+    completion = client.chat.completions.create(
         model=model,
         messages=messages,
         tools=tools or NOT_GIVEN,
@@ -130,6 +131,16 @@ def _chat_completion_request_with_max_tokens(
         max_tokens=MAX_TOKENS,
         stop=stop,
     )
+    choice = completion.choices[0]
+    if choice.finish_reason == "length":
+        reasoning = getattr(choice.message, "reasoning_content", None) or getattr(choice.message, "reasoning", None)
+        logging.warning(
+            "completion cut by max_tokens (output tokens: %s, reasoning chars: %s, content chars: %s)",
+            completion.usage.completion_tokens if completion.usage else "?",
+            len(reasoning or ""),
+            len(choice.message.content or ""),
+        )
+    return completion
 
 
 openai_llm.chat_completion_request = _chat_completion_request_with_max_tokens
