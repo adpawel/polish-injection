@@ -108,10 +108,26 @@ Shared principles:
 
 ### Models
 
-- **Polish:** Bielik 11B Instruct (tool calling via `bielik-tools`),
-  Llama-PLLuM Instruct. ← the main differentiator.
-- **Open multilingual:** Qwen2.5-Instruct, Llama-3.1-8B-Instruct.
-- **Commercial:** 1–2 via API (watch the costs — estimate on a small sample).
+Decided 2026-10-11, after the utility checks in `notes/models.md` (workspace tasks 0–9, EN, no attack):
+
+| group | model | tool calling | utility 0–9 | status |
+|---|---|---|---|---|
+| commercial | GPT-4o-mini | native | 9/10 | core |
+| open multilingual | Qwen3-8B | native | 7/10 (thinking) | core |
+| Polish | PLLuM-12B-instruct-2512 | prompt-based (`<tool_call>` JSON) | 4/10 | core |
+| Polish | Bielik-11B-v3.0-Instruct | native (vLLM + `bielik-tools`) | 2/10 | core |
+| base of PLLuM-12B | Mistral-Nemo-Instruct-2407 | prompt-based, same as PLLuM | 2/10 | core |
+| commercial | Gemini (Flash) | native | — | **optional** — run at the end if time permits |
+| commercial | Claude (Haiku) | native | — | **optional** — run at the end if time permits |
+
+- Mistral-Nemo is kept only as the base of PLLuM-12B (same tool-calling mode → the pair shows the effect
+  of the Polish fine-tuning).
+- Dropped: Llama-3.1-8B (1/10), Llama-PLLuM-8B (12B pairs better with Bielik 11B).
+- No agent frameworks / scaffolds to raise utility of weak models: they would change both utility and
+  attack surface, i.e. a confound. Only adapters needed to talk to the model at all (prompt-based tool
+  calling, text tool-call recovery, `<think>` stripping, `max_tokens` cap), each reported as a deviation.
+- Low utility does not prevent measuring ASR; for weak models also report ASR on the tasks the model
+  solves without an attack.
 
 ### Metrics
 
@@ -128,13 +144,13 @@ Shared principles:
 - **AgentDojo** (latest version) for the IPI part.
 - SQLite as the world state + reset script.
 - A single agent loop (ReAct) shared by all models.
-- Open models locally / on Colab; commercial and some open models via API.
-- No own GPU — everything must run on APIs + Colab.
+- Commercial models and Qwen3 via API; Bielik, PLLuM and Mistral-Nemo self-hosted with vLLM on a rented
+  GPU (RunPod, A40 48 GB + network volume; see `notes/models.md`).
 
 ## Minimal scope (safe for one semester)
 
-Two vectors (tool poisoning + IPI via data), four models (Bielik, PLLuM, one
-multilingual, one commercial), all four language configurations.
+Two vectors (tool poisoning + IPI via data), the five core models (GPT-4o-mini, Qwen3-8B,
+PLLuM-12B, Bielik, Mistral-Nemo), all four language configurations. Gemini and Claude are optional.
 RQ4 and the third vector (puppet) as extensions if time permits.
 
 ## Literature
