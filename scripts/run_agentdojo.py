@@ -16,6 +16,14 @@
    (Mistral API, vLLM with `--tokenizer-mode mistral`). Set `AGENTDOJO_SYSTEM_ROLE=1` to send `system`.
 6. Prompt-based tool calling for models whose chat template has no tool support (PLLuM): set
    `AGENTDOJO_PROMPTING=1` with the OPENAI_COMPATIBLE provider (see `JsonToolCallPromptingLLM`).
+7. Translations (data/<lang>/): `AGENTDOJO_TASK_LANG=pl` replaces the user prompts; a task without a translation
+   fails instead of silently running in English. The attack `important_instructions_pl` injects the Polish
+   template with Polish goals; its English counterpart is `important_instructions_no_model_name`. Every
+   translation stores the English source, which must equal AgentDojo's text. Only benchmark v1.2.2.
+8. Non-ASCII in tool results: AgentDojo dumps tool results with `yaml.safe_dump`, which escapes every non-ASCII
+   character, so the model saw a Polish injection as `wa\\u017Cna wiadomo\\u015B\\u0107`. Tool results are now
+   dumped with `allow_unicode=True` (always, in both languages; English environment data is ASCII apart from a
+   few U+FFFD characters).
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -25,16 +33,23 @@ import json
 import logging
 import os
 import re
+import sys
 import uuid
+from functools import partial
+from pathlib import Path
 
+import yaml
 from openai import NOT_GIVEN
 
-from agentdojo.agent_pipeline import agent_pipeline
+from agentdojo.agent_pipeline import agent_pipeline, tool_execution
 from agentdojo.agent_pipeline.llms import openai_llm
 from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM
+from agentdojo.attacks.attack_registry import register_attack
+from agentdojo.attacks.important_instructions_attacks import ImportantInstructionsAttack
 from agentdojo.benchmark import TaskResults
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall
 from agentdojo.scripts.benchmark import main
+from agentdojo.task_suite.load_suites import get_suites
 from agentdojo.types import ChatAssistantMessage, get_text_content_as_str, text_content_block_from_string
 
 TaskResults.model_rebuild()
@@ -240,6 +255,75 @@ def _get_llm_prompting(provider, model, model_id, tool_delimiter):
 
 if os.environ.get("AGENTDOJO_PROMPTING") == "1":
     agent_pipeline.get_llm = _get_llm_prompting
+
+
+def _yaml_dump_unicode(data) -> str:
+    return yaml.safe_dump(data, allow_unicode=True)
+
+
+agent_pipeline.tool_result_to_str = partial(tool_execution.tool_result_to_str, dump_fn=_yaml_dump_unicode)
+
+
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+BENCHMARK_VERSION = "v1.2.2"
+
+
+def load_translations(lang: str, name: str) -> dict:
+    path = DATA_DIR / lang / f"{name}.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def translated(entry: dict, lang: str, key: str, en_text: str) -> str:
+    if entry["en"] != en_text:
+        raise ValueError(f"{key}: the English source in data/{lang}/ differs from AgentDojo's text")
+    return entry[lang]
+
+
+def _untranslated_prompt(task_id: str, lang: str) -> property:
+    def prompt(self):
+        raise KeyError(f"{task_id} has no '{lang}' translation in data/{lang}/")
+
+    return property(prompt)
+
+
+def translate_user_tasks(lang: str) -> None:
+    for suite_name, suite in get_suites(BENCHMARK_VERSION).items():
+        translations = load_translations(lang, suite_name).get("user_tasks", {})
+        for task_id, task in suite.user_tasks.items():
+            if task_id in translations:
+                type(task).PROMPT = translated(translations[task_id], lang, task_id, task.PROMPT)
+            else:
+                type(task).PROMPT = _untranslated_prompt(task_id, lang)
+
+
+@register_attack
+class ImportantInstructionsAttackPL(ImportantInstructionsAttack):
+    """`important_instructions` with the Polish template, Polish goals and a fixed model name."""
+
+    name = "important_instructions_pl"
+    lang = "pl"
+
+    def __init__(self, task_suite, target_pipeline) -> None:
+        super().__init__(task_suite, target_pipeline)
+        template = load_translations(self.lang, "attacks")["important_instructions"]
+        self.jailbreak = translated(template, self.lang, "important_instructions", ImportantInstructionsAttack._JB_STRING)
+        self.model_name = template["model_name"][self.lang]
+        self.goals = load_translations(self.lang, task_suite.name).get("injection_tasks", {})
+
+    def attack(self, user_task, injection_task) -> dict[str, str]:
+        if injection_task.ID not in self.goals:
+            raise KeyError(f"{injection_task.ID} has no '{self.lang}' translation in data/{self.lang}/")
+        goal = translated(self.goals[injection_task.ID], self.lang, injection_task.ID, injection_task.GOAL)
+        return {
+            inj: self.jailbreak.format(goal=goal, user=self.user_name, model=self.model_name)
+            for inj in self.get_injection_candidates(user_task)
+        }
+
+
+if os.environ.get("AGENTDOJO_TASK_LANG", "en") != "en":
+    if "--benchmark-version" in sys.argv and sys.argv[sys.argv.index("--benchmark-version") + 1] != BENCHMARK_VERSION:
+        raise SystemExit(f"translations exist only for {BENCHMARK_VERSION}")
+    translate_user_tasks(os.environ["AGENTDOJO_TASK_LANG"])
 
 if __name__ == "__main__":
     main()
