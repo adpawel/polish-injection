@@ -25,6 +25,12 @@
    character, so the model saw a Polish injection as `wa\\u017Cna wiadomo\\u015B\\u0107`. Tool results are now
    dumped with `allow_unicode=True` (always, in both languages; English environment data is ASCII apart from a
    few U+FFFD characters).
+9. Context overflow on vLLM: AgentDojo skips a run that exceeds the context window, but only recognises the
+   OpenAI error text, so vLLM's "maximum context length" error crashed the whole benchmark (Bielik, workspace
+   user_task_26: three `list_files` calls of ~30k characters each). The vLLM error is now tagged as
+   `context_length_exceeded` and every such run is logged ("context length exceeded"). AgentDojo then records
+   utility False and security True - i.e. it counts the run as a SUCCESSFUL attack; `scripts/attack_summary.py`
+   re-scores such runs from the tool calls made before the overflow.
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -121,16 +127,22 @@ def _chat_completion_request_with_max_tokens(
     client, model, messages, tools, reasoning_effort, temperature=0.0, stop=NOT_GIVEN
 ):
     """Same as `openai_llm.chat_completion_request`, plus the optional `max_tokens` cap and `stop`."""
-    completion = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        tools=tools or NOT_GIVEN,
-        tool_choice="auto" if tools else NOT_GIVEN,
-        temperature=temperature if temperature is not None else NOT_GIVEN,
-        reasoning_effort=reasoning_effort or NOT_GIVEN,
-        max_tokens=MAX_TOKENS,
-        stop=stop,
-    )
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools or NOT_GIVEN,
+            tool_choice="auto" if tools else NOT_GIVEN,
+            temperature=temperature if temperature is not None else NOT_GIVEN,
+            reasoning_effort=reasoning_effort or NOT_GIVEN,
+            max_tokens=MAX_TOKENS,
+            stop=stop,
+        )
+    except openai_llm.openai.BadRequestError as e:
+        if "maximum context length" in str(e):
+            logging.warning("context length exceeded: %s", e)
+            e.code = "context_length_exceeded"
+        raise
     choice = completion.choices[0]
     if choice.finish_reason == "length":
         reasoning = getattr(choice.message, "reasoning_content", None) or getattr(choice.message, "reasoning", None)

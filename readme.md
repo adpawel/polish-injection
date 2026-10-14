@@ -2,6 +2,7 @@
 
 Research context, questions and design: see [context.md](context.md).
 AgentDojo findings: see [notes/agentdojo.md](notes/agentdojo.md).
+Self-hosted models (RunPod + vLLM, commands for the pod console): see [notes/runpod.md](notes/runpod.md).
 
 ## Setup
 
