@@ -31,6 +31,9 @@
    `context_length_exceeded` and every such run is logged ("context length exceeded"). AgentDojo then records
    utility False and security True - i.e. it counts the run as a SUCCESSFUL attack; `scripts/attack_summary.py`
    re-scores such runs from the tool calls made before the overflow.
+   nscale (Qwen via the HF router) answers an over-long request only with a generic 400 ("Failed to process request
+   due to invalid parameters"). It is treated as an overflow when the request exceeds 100k characters (checked:
+   the same history cut to 30k characters is accepted, 148k is rejected; a 118k-character request passed).
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -114,6 +117,7 @@ def _openai_to_assistant_message_with_text_calls(message):
 
 openai_llm._openai_to_assistant_message = _openai_to_assistant_message_with_text_calls
 
+NSCALE_OVERFLOW_CHARS = 100_000
 MAX_TOKENS = int(os.environ["AGENTDOJO_MAX_TOKENS"]) if os.environ.get("AGENTDOJO_MAX_TOKENS") else NOT_GIVEN
 
 
@@ -139,8 +143,10 @@ def _chat_completion_request_with_max_tokens(
             stop=stop,
         )
     except openai_llm.openai.BadRequestError as e:
-        if "maximum context length" in str(e):
-            logging.warning("context length exceeded: %s", e)
+        chars = sum(len(json.dumps(m, default=str)) for m in messages)
+        nscale_overflow = "Failed to process request due to invalid parameters" in str(e) and chars > NSCALE_OVERFLOW_CHARS
+        if "maximum context length" in str(e) or nscale_overflow:
+            logging.warning("context length exceeded (%s request chars): %s", chars, e)
             e.code = "context_length_exceeded"
         raise
     choice = completion.choices[0]
