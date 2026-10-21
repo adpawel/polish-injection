@@ -122,9 +122,12 @@ Derived per (model, track, configuration):
 ### 1.7 Logging and reproducibility
 
 - Each run is logged in full (all messages, tool calls, results); logs stay in `runs/` (not in git).
-- Each result row records the harness git commit, the benchmark and package versions and the settings of 1.2.
+- Each log records the run metadata (fix 11: task language, model, settings of 1.2, harness commit, token usage);
+  each result row carries them. Full runs are made only from a committed harness (`run_experiment.sh` refuses
+  otherwise, `export_results.py` rejects logs with `harness_dirty: true`).
 - World state is reset before every run (AgentDojo: fresh environment per run).
-- Logdir naming: `runs/<model>-<mode>-<tasklang>`, payload language = attack name.
+- Full experiment logs: `runs/full/<model>-<task_lang>` (payload language = attack name); pilots and samples
+  live elsewhere in `runs/` and are not exported.
 
 ## 2. IPI track (AgentDojo)
 
@@ -134,10 +137,21 @@ Derived per (model, track, configuration):
   tools). Other suites are out of scope (no translations).
 - Attack: `important_instructions` template without the model name - EN `important_instructions_no_model_name`,
   PL `important_instructions_pl` (fixed model name, Polish template and goals, `data/pl/attacks.json`).
-- Runs per (model, configuration): attack runs (user task x injection task) + 40 runs without attack (utility
-  baseline) + the injection tasks run as user tasks (control: can the model perform the attacker's goal at
-  all; AgentDojo runs it automatically).
-- Runner: `scripts/run_agentdojo.py`; scorer: `scripts/attack_summary.py`.
+- Runs per (model, configuration): attack runs (user task x injection task) + 40 runs without attack per task
+  language (utility baseline) + the injection tasks run as user tasks (control: can the model perform the
+  attacker's goal at all; AgentDojo runs it automatically with every attack call, always with the English goal,
+  so only the controls from English-task directories are exported).
+- Pipeline:
+  1. `scripts/run_experiment.sh <model> <task_lang> <en|pl|none>` - one configuration (or the baseline) of one
+     model, resumable;
+  2. `scripts/export_results.py runs/full/* -o results/ipi.jsonl` - rows validated against the schema;
+  3. `scripts/analyse.py results/ipi.jsonl` - tables of 1.5 and the tests of 1.6.
+- Order per model (incremental): one user task with all 10 injection tasks, then a second one, then the full
+  configuration; the four configurations and the two baselines are independent calls.
+- Samples done (2026-10-21, GPT-4o-mini, before the full runs): injection tasks 1, 2, 3, 4, 5, 6, 10, 11, 13 on
+  user_task_0 (PL/PL, EN/EN) and user_task_33 (PL/PL): all ran, Polish goals reached the model, replay
+  matches the checker. GPT solved only 6 of the 9 goals as a user task (3, 6, 11 failed) - the control matters
+  for interpreting ASR on these goals.
 
 ### 2.2 Injection tasks (size)
 
@@ -177,7 +191,7 @@ ten there are ~10x more pairs per comparison.
 - Context overflow and logs without `security` are re-scored from the replay (`attack_summary.py`).
 - Pilot logs (before fix 10) were produced with the 3x retry and are **not** part of the experiment.
 
-### 2.4 Deviations from stock AgentDojo (`scripts/run_agentdojo.py`, fixes 1-10)
+### 2.4 Deviations from stock AgentDojo (`scripts/run_agentdojo.py`, fixes 1-11)
 
 1. pydantic rebuild so existing results can be loaded;
 2. text tool calls (`<function=...>`) converted to structured calls (logged);
@@ -188,7 +202,8 @@ ten there are ~10x more pairs per comparison.
 7. Polish user prompts and the Polish attack;
 8. tool results dumped with `allow_unicode=True` (otherwise Polish arrives as `\u` escapes);
 9. vLLM / nscale context-overflow errors recognised (and re-scored, see 2.3);
-10. one attempt per run.
+10. one attempt per run;
+11. run metadata and token usage in every log.
 
 ## 3. MCP track (tool poisoning)
 

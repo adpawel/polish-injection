@@ -42,6 +42,10 @@
    the environment and messages of the first attempt), logged ("AgentDojo retry skipped") and the run is scored
    as AgentDojo scores a run without output. Every log records `attempts: 1`, and `retry_skipped: true` when a
    retry was refused.
+11. Run metadata: every log also records what the result schema (schemas/run_result.schema.json) needs and
+   AgentDojo does not store: `task_lang`, `model` and `model_id`, `tool_calling`, `temperature`, `max_tokens`,
+   `max_steps`, the harness commit (`harness_commit`, `harness_dirty`: uncommitted changes in tracked files) and
+   the token usage summed over the run (`input_tokens`, `output_tokens`).
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -51,6 +55,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import uuid
 from functools import partial
@@ -159,6 +164,10 @@ def _chat_completion_request_with_max_tokens(
             logging.warning("context length exceeded (%s request chars): %s", chars, e)
             e.code = "context_length_exceeded"
         raise
+    logger = Logger.get()
+    if isinstance(logger, TraceLogger) and completion.usage and "input_tokens" in logger.context:
+        logger.context["input_tokens"] += completion.usage.prompt_tokens or 0
+        logger.context["output_tokens"] += completion.usage.completion_tokens or 0
     choice = completion.choices[0]
     if choice.finish_reason == "length":
         reasoning = getattr(choice.message, "reasoning_content", None) or getattr(choice.message, "reasoning", None)
@@ -296,6 +305,41 @@ if os.environ.get("AGENTDOJO_PROMPTING") == "1":
     agent_pipeline.get_llm = _get_llm_prompting
 
 
+def _cli_option(name: str) -> str | None:
+    for i, arg in enumerate(sys.argv):
+        if arg == name and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        if arg.startswith(name + "="):
+            return arg.split("=", 1)[1]
+    return None
+
+
+def _git(*args: str) -> str:
+    repo = Path(__file__).resolve().parent.parent
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True).stdout.strip()
+
+
+# Schema ids of the models (notes/protocol.md 1.1), keyed by AgentDojo's --model / --model-id.
+MODEL_IDS = {
+    "gpt-4o-mini-2024-07-18": "gpt-4o-mini",
+    "Qwen/Qwen3-8B:nscale": "qwen3-8b",
+    "pllum-12b": "pllum-12b",
+    "bielik-11b-v3": "bielik-11b-v3",
+    "mistral-nemo": "mistral-nemo",
+}
+_model_id = _cli_option("--model-id") or (_cli_option("--model") or "").lower().replace("_", "-")
+RUN_METADATA = {
+    "task_lang": os.environ.get("AGENTDOJO_TASK_LANG", "en"),
+    "model": MODEL_IDS.get(_model_id),
+    "model_id": _model_id,
+    "tool_calling": "prompting" if os.environ.get("AGENTDOJO_PROMPTING") == "1" else "native",
+    "temperature": 0.0,
+    "max_tokens": MAX_TOKENS if MAX_TOKENS is not NOT_GIVEN else None,
+    "max_steps": 15,
+    "harness_commit": _git("rev-parse", "--short", "HEAD"),
+    "harness_dirty": bool(_git("status", "--porcelain", "--untracked-files=no")),
+}
+
 _pipeline_query = agent_pipeline.AgentPipeline.query
 
 
@@ -312,6 +356,7 @@ def _pipeline_query_single_attempt(self, query, runtime, env=EmptyEnv(), message
         error.messages = list(logger.messages)  # without the assistant message AbortAgentError appends
         raise error
     logger.context["attempts"] = 1
+    logger.context.update(RUN_METADATA, input_tokens=0, output_tokens=0)
     return _pipeline_query(self, query, runtime, env, messages, extra_args)
 
 
