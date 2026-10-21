@@ -142,9 +142,11 @@ Derived per (model, track, configuration):
   attacker's goal at all; AgentDojo runs it automatically with every attack call, always with the English goal,
   so only the controls from English-task directories are exported).
 - Pipeline:
-  1. `scripts/run_experiment.sh <model> <task_lang> <en|pl|none>` - one configuration (or the baseline) of one
-     model, resumable;
-  2. `scripts/export_results.py runs/full/* -o results/ipi.jsonl` - rows validated against the schema;
+  1. `scripts/run_experiment.sh <model> <task_lang> <en|pl|none> [<first>-<last>]` - one configuration (or the
+     baseline) of one model, optionally only user tasks first..last (parts of ~100 attack runs, e.g. 0-9);
+     resumable, logs of runs cut off in the middle are moved to `runs/full/_cutoff/` and the runs are made again;
+  2. `scripts/export_results.py runs/full/*-en runs/full/*-pl -o results/ipi.jsonl` - rows validated against
+     the schema;
   3. `scripts/analyse.py results/ipi.jsonl` - tables of 1.5 and the tests of 1.6.
 - Order per model (incremental): one user task with all 10 injection tasks, then a second one, then the full
   configuration; the four configurations and the two baselines are independent calls.
