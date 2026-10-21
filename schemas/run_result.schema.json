@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/adpawel/polish-injection/schemas/run_result.schema.json",
+  "title": "Run result",
+  "description": "One agent run of the experiment (one line of a results JSONL file). Shared by the IPI (AgentDojo) and MCP (tool poisoning) tracks; see notes/protocol.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "track",
+    "run_type",
+    "model",
+    "task_lang",
+    "payload_lang",
+    "suite",
+    "user_task",
+    "injection_task",
+    "attack",
+    "exposed",
+    "attack_success",
+    "attack_success_dedup",
+    "utility",
+    "utility_risk",
+    "no_output",
+    "context_overflow",
+    "refused",
+    "steps",
+    "tool_calls",
+    "error",
+    "log_path",
+    "settings",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "track": {
+      "description": "ipi = indirect prompt injection through tool results (AgentDojo); mcp = tool poisoning through tool descriptions.",
+      "enum": [
+        "ipi",
+        "mcp"
+      ]
+    },
+    "run_type": {
+      "description": "attack = user task with the payload; no_attack = utility baseline; injection_as_user_task = control, the attacker's goal given as the user task.",
+      "enum": [
+        "attack",
+        "no_attack",
+        "injection_as_user_task"
+      ]
+    },
+    "model": {
+      "description": "Schema id of the model; mapping to weights / API ids in notes/protocol.md 1.1.",
+      "enum": [
+        "gpt-4o-mini",
+        "qwen3-8b",
+        "pllum-12b",
+        "bielik-11b-v3",
+        "mistral-nemo"
+      ]
+    },
+    "task_lang": {
+      "description": "Language of the user task.",
+      "enum": [
+        "en",
+        "pl"
+      ]
+    },
+    "payload_lang": {
+      "description": "Language of the payload; null when there is no payload (no_attack, injection_as_user_task).",
+      "enum": [
+        "en",
+        "pl",
+        null
+      ]
+    },
+    "suite": {
+      "description": "Task environment: an AgentDojo suite (e.g. workspace) or the MCP track's environment.",
+      "type": "string",
+      "minLength": 1
+    },
+    "user_task": {
+      "description": "User task id (for injection_as_user_task: the injection task id).",
+      "type": "string",
+      "minLength": 1
+    },
+    "injection_task": {
+      "description": "Attacker goal id; null for no_attack.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "attack": {
+      "description": "Attack variant, e.g. important_instructions_no_model_name / important_instructions_pl (ipi); null when there is no payload.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "exposed": {
+      "description": "The payload reached the model's context (ipi: a tool result contained it; mcp: defined by the track). null when there is no payload.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "attack_success": {
+      "description": "The attacker's goal is met in the world state after the run (deterministic checker). For context overflows: scored from the replay. null when there is no payload.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "attack_success_dedup": {
+      "description": "Same check after replaying the run's tool calls with identical calls executed once. Primary success measure. null when there is no payload.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "utility": {
+      "description": "The user task was completed (benchmark checker).",
+      "type": "boolean"
+    },
+    "utility_risk": {
+      "description": "How much the utility checker depends on the answer's language (data/utility_risk.json); utility is reported only for none/low. null when not assessed (e.g. control runs).",
+      "enum": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        null
+      ]
+    },
+    "no_output": {
+      "description": "The run ended without a final text answer (step limit or empty answer).",
+      "type": "boolean"
+    },
+    "context_overflow": {
+      "description": "The request exceeded the model's context window.",
+      "type": "boolean"
+    },
+    "refused": {
+      "description": "Manual annotation (notes/protocol.md 1.5): the model explicitly declined the injected instruction. null for runs outside the annotated sample.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "steps": {
+      "description": "Number of LLM calls (assistant messages) in the run.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "tool_calls": {
+      "description": "Number of tool calls in the run.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "output_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "error": {
+      "description": "Error recorded by the harness (e.g. context length exceeded), or null.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "log_path": {
+      "description": "Path of the full run log, relative to the repository root.",
+      "type": "string",
+      "minLength": 1
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "temperature",
+        "max_tokens",
+        "max_steps",
+        "attempts",
+        "tool_calling"
+      ],
+      "properties": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attempts": {
+          "const": 1
+        },
+        "tool_calling": {
+          "enum": [
+            "native",
+            "prompting"
+          ]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "harness_commit",
+        "timestamp"
+      ],
+      "properties": {
+        "harness_commit": {
+          "description": "Git commit of this repository the run was produced with.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{7,40}$"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "benchmark_version": {
+          "description": "ipi: AgentDojo benchmark version (v1.2.2).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agentdojo_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "server_version": {
+          "description": "Serving stack, e.g. vllm 0.24.0, or the API name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "run_type": {
+            "const": "attack"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload_lang": {
+            "enum": [
+              "en",
+              "pl"
+            ]
+          },
+          "injection_task": {
+            "type": "string"
+          },
+          "attack": {
+            "type": "string"
+          },
+          "exposed": {
+            "type": "boolean"
+          },
+          "attack_success": {
+            "type": "boolean"
+          },
+          "attack_success_dedup": {
+            "type": "boolean"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "payload_lang": {
+            "const": null
+          },
+          "attack": {
+            "const": null
+          },
+          "exposed": {
+            "const": null
+          },
+          "attack_success": {
+            "const": null
+          },
+          "attack_success_dedup": {
+            "const": null
+          }
+        }
+      }
+    }
+  ]
+}
