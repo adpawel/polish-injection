@@ -34,6 +34,14 @@
    nscale (Qwen via the HF router) answers an over-long request only with a generic 400 ("Failed to process request
    due to invalid parameters"). It is treated as an overflow when the request exceeds 100k characters (checked:
    the same history cut to 30k characters is accepted, 148k is rejected; a 118k-character request passed).
+10. One attempt per run: when the last assistant message has no content (in our logs: always the 15-step tool
+   loop limit), AgentDojo reruns the whole task up to 3 times on the SAME, already modified environment and logs
+   only the last attempt. So a looping model got up to three chances to read and follow the injection, the
+   side effects of all attempts were scored together, and the log showed only part of them. Each run now has
+   exactly one attempt: a rerun is stopped before it starts (via AgentDojo's own `AbortAgentError`, which keeps
+   the environment and messages of the first attempt), logged ("AgentDojo retry skipped") and the run is scored
+   as AgentDojo scores a run without output. Every log records `attempts: 1`, and `retry_skipped: true` when a
+   retry was refused.
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -52,12 +60,14 @@ import yaml
 from openai import NOT_GIVEN
 
 from agentdojo.agent_pipeline import agent_pipeline, tool_execution
+from agentdojo.agent_pipeline.errors import AbortAgentError
 from agentdojo.agent_pipeline.llms import openai_llm
 from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM
 from agentdojo.attacks.attack_registry import register_attack
 from agentdojo.attacks.important_instructions_attacks import ImportantInstructionsAttack
 from agentdojo.benchmark import TaskResults
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall
+from agentdojo.logging import Logger, TraceLogger
 from agentdojo.scripts.benchmark import main
 from agentdojo.task_suite.load_suites import get_suites
 from agentdojo.types import ChatAssistantMessage, get_text_content_as_str, text_content_block_from_string
@@ -284,6 +294,28 @@ def _get_llm_prompting(provider, model, model_id, tool_delimiter):
 
 if os.environ.get("AGENTDOJO_PROMPTING") == "1":
     agent_pipeline.get_llm = _get_llm_prompting
+
+
+_pipeline_query = agent_pipeline.AgentPipeline.query
+
+
+def _pipeline_query_single_attempt(self, query, runtime, env=EmptyEnv(), messages=[], extra_args={}):
+    """Same as `AgentPipeline.query`, but refuses AgentDojo's retries: one agent run per logged task."""
+    logger = Logger.get()
+    if not isinstance(logger, TraceLogger):
+        return _pipeline_query(self, query, runtime, env, messages, extra_args)
+    if logger.context.get("attempts"):
+        if not logger.context.get("retry_skipped"):
+            logging.warning("AgentDojo retry skipped (run without final answer)")
+            logger.context["retry_skipped"] = True
+        error = AbortAgentError("retry skipped", [], env)
+        error.messages = list(logger.messages)  # without the assistant message AbortAgentError appends
+        raise error
+    logger.context["attempts"] = 1
+    return _pipeline_query(self, query, runtime, env, messages, extra_args)
+
+
+agent_pipeline.AgentPipeline.query = _pipeline_query_single_attempt
 
 
 def _yaml_dump_unicode(data) -> str:
