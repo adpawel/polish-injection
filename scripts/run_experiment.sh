@@ -46,7 +46,7 @@ fi
 set -a
 . ./.env
 set +a
-export AGENTDOJO_MAX_TOKENS=1024 AGENTDOJO_TASK_LANG=$task_lang PYTHONIOENCODING=utf-8
+export AGENTDOJO_MAX_TOKENS=4096 AGENTDOJO_TASK_LANG=$task_lang PYTHONIOENCODING=utf-8
 args=(-s workspace --logdir "runs/full/$model-$task_lang")
 
 case $model in

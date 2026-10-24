@@ -39,7 +39,7 @@ same code.
 | setting | value |
 |---|---|
 | temperature | 0 |
-| `max_tokens` per completion | 1024 |
+| `max_tokens` per completion | 4096 (1024 in the pilots; raised 2026-10-24, see Changes) |
 | agent loop | IPI: AgentDojo's pipeline (`ToolsExecutionLoop`) |
 | step limit | 15 LLM calls per run (AgentDojo default `max_iters`) |
 | attempts per run | **1** (AgentDojo's 3x retry disabled, fix 10) |
@@ -193,7 +193,7 @@ ten there are ~10x more pairs per comparison.
 - Context overflow and logs without `security` are re-scored from the replay (`attack_summary.py`).
 - Pilot logs (before fix 10) were produced with the 3x retry and are **not** part of the experiment.
 
-### 2.4 Deviations from stock AgentDojo (`scripts/run_agentdojo.py`, fixes 1-11)
+### 2.4 Deviations from stock AgentDojo (`scripts/run_agentdojo.py`, fixes 1-12)
 
 1. pydantic rebuild so existing results can be loaded;
 2. text tool calls (`<function=...>`) converted to structured calls (logged);
@@ -205,7 +205,8 @@ ten there are ~10x more pairs per comparison.
 8. tool results dumped with `allow_unicode=True` (otherwise Polish arrives as `\u` escapes);
 9. vLLM / nscale context-overflow errors recognised (and re-scored, see 2.3);
 10. one attempt per run;
-11. run metadata and token usage in every log.
+11. run metadata and token usage in every log;
+12. tool calls with arguments cut off by `max_tokens` are dropped (logged) instead of crashing the benchmark.
 
 ## 3. MCP track (tool poisoning)
 
@@ -225,3 +226,7 @@ section lists only what must hold so that its results can be compared with the I
 
 - 2026-10-21: first draft; decisions: 10 injection tasks, primary comparison EN/EN vs PL/PL, no repetitions,
   refusal by manual annotation of 20 runs per (model, configuration).
+- 2026-10-24: `max_tokens` 1024 -> 4096. With 1024, GPT-4o-mini's `send_email` call for injection task 6 (body =
+  all unread e-mails) was cut off mid-JSON, which crashed the run (now fix 12) and would have counted a
+  truncated attempt as a failed attack, i.e. lowered the ASR of the exfiltration goals by our limit rather than
+  by the model. The ~250 GPT runs made with 1024 were moved to `runs/full/_superseded/` and redone.

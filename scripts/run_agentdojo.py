@@ -46,6 +46,10 @@
    AgentDojo does not store: `task_lang`, `model` and `model_id`, `tool_calling`, `temperature`, `max_tokens`,
    `max_steps`, the harness commit (`harness_commit`, `harness_dirty`: uncommitted changes in tracked files) and
    the token usage summed over the run (`input_tokens`, `output_tokens`).
+12. Cut-off tool calls: a tool call whose JSON arguments are cut off by `max_tokens` (seen with GPT-4o-mini writing
+   the body of an exfiltration e-mail) crashed the whole benchmark in AgentDojo's `json.loads`. Such calls are
+   dropped and logged ("dropped tool call with unparsable arguments"); a message left without calls and text
+   ends the run without output. With `max_tokens` 4096 (protocol) this should be rare.
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -117,8 +121,23 @@ def _strip_reasoning(message):
     return message
 
 
+def _parses(arguments: str) -> bool:
+    try:
+        json.loads(arguments)
+        return True
+    except json.JSONDecodeError:
+        return False
+
+
 def _openai_to_assistant_message_with_text_calls(message):
     message = _strip_reasoning(message)
+    if message.tool_calls and not all(_parses(call.function.arguments) for call in message.tool_calls):
+        valid = [call for call in message.tool_calls if _parses(call.function.arguments)]
+        logging.warning(
+            "dropped tool call with unparsable arguments (cut by max_tokens?): %s",
+            [call.function.name for call in message.tool_calls if call not in valid],
+        )
+        message = message.model_copy(update={"tool_calls": valid or None})
     converted = _openai_to_assistant_message(message)
     if converted["tool_calls"] or not message.content:
         return converted
