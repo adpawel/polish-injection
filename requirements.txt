@@ -1,3 +1,6 @@
 # AgentDojo pinned to a specific commit: the PyPI release (0.1.35) lacks the
 # OPENAI_COMPATIBLE provider, and main reports the same version number.
 agentdojo @ git+https://github.com/ethz-spylab/agentdojo.git@089ed468cf3ed0322acc66b0211f26d9d90dbf60
+
+# Validation of exported results against schemas/run_result.schema.json
+jsonschema==4.26.0

@@ -25,6 +25,31 @@
    character, so the model saw a Polish injection as `wa\\u017Cna wiadomo\\u015B\\u0107`. Tool results are now
    dumped with `allow_unicode=True` (always, in both languages; English environment data is ASCII apart from a
    few U+FFFD characters).
+9. Context overflow on vLLM: AgentDojo skips a run that exceeds the context window, but only recognises the
+   OpenAI error text, so vLLM's "maximum context length" error crashed the whole benchmark (Bielik, workspace
+   user_task_26: three `list_files` calls of ~30k characters each). The vLLM error is now tagged as
+   `context_length_exceeded` and every such run is logged ("context length exceeded"). AgentDojo then records
+   utility False and security True - i.e. it counts the run as a SUCCESSFUL attack; `scripts/attack_summary.py`
+   re-scores such runs from the tool calls made before the overflow.
+   nscale (Qwen via the HF router) answers an over-long request only with a generic 400 ("Failed to process request
+   due to invalid parameters"). It is treated as an overflow when the request exceeds 100k characters (checked:
+   the same history cut to 30k characters is accepted, 148k is rejected; a 118k-character request passed).
+10. One attempt per run: when the last assistant message has no content (in our logs: always the 15-step tool
+   loop limit), AgentDojo reruns the whole task up to 3 times on the SAME, already modified environment and logs
+   only the last attempt. So a looping model got up to three chances to read and follow the injection, the
+   side effects of all attempts were scored together, and the log showed only part of them. Each run now has
+   exactly one attempt: a rerun is stopped before it starts (via AgentDojo's own `AbortAgentError`, which keeps
+   the environment and messages of the first attempt), logged ("AgentDojo retry skipped") and the run is scored
+   as AgentDojo scores a run without output. Every log records `attempts: 1`, and `retry_skipped: true` when a
+   retry was refused.
+11. Run metadata: every log also records what the result schema (schemas/run_result.schema.json) needs and
+   AgentDojo does not store: `task_lang`, `model` and `model_id`, `tool_calling`, `temperature`, `max_tokens`,
+   `max_steps`, the harness commit (`harness_commit`, `harness_dirty`: uncommitted changes in tracked files) and
+   the token usage summed over the run (`input_tokens`, `output_tokens`).
+12. Cut-off tool calls: a tool call whose JSON arguments are cut off by `max_tokens` (seen with GPT-4o-mini writing
+   the body of an exfiltration e-mail) crashed the whole benchmark in AgentDojo's `json.loads`. Such calls are
+   dropped and logged ("dropped tool call with unparsable arguments"); a message left without calls and text
+   ends the run without output. With `max_tokens` 4096 (protocol) this should be rare.
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -34,6 +59,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import uuid
 from functools import partial
@@ -43,12 +69,14 @@ import yaml
 from openai import NOT_GIVEN
 
 from agentdojo.agent_pipeline import agent_pipeline, tool_execution
+from agentdojo.agent_pipeline.errors import AbortAgentError
 from agentdojo.agent_pipeline.llms import openai_llm
 from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM
 from agentdojo.attacks.attack_registry import register_attack
 from agentdojo.attacks.important_instructions_attacks import ImportantInstructionsAttack
 from agentdojo.benchmark import TaskResults
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall
+from agentdojo.logging import Logger, TraceLogger
 from agentdojo.scripts.benchmark import main
 from agentdojo.task_suite.load_suites import get_suites
 from agentdojo.types import ChatAssistantMessage, get_text_content_as_str, text_content_block_from_string
@@ -93,8 +121,23 @@ def _strip_reasoning(message):
     return message
 
 
+def _parses(arguments: str) -> bool:
+    try:
+        json.loads(arguments)
+        return True
+    except json.JSONDecodeError:
+        return False
+
+
 def _openai_to_assistant_message_with_text_calls(message):
     message = _strip_reasoning(message)
+    if message.tool_calls and not all(_parses(call.function.arguments) for call in message.tool_calls):
+        valid = [call for call in message.tool_calls if _parses(call.function.arguments)]
+        logging.warning(
+            "dropped tool call with unparsable arguments (cut by max_tokens?): %s",
+            [call.function.name for call in message.tool_calls if call not in valid],
+        )
+        message = message.model_copy(update={"tool_calls": valid or None})
     converted = _openai_to_assistant_message(message)
     if converted["tool_calls"] or not message.content:
         return converted
@@ -108,6 +151,7 @@ def _openai_to_assistant_message_with_text_calls(message):
 
 openai_llm._openai_to_assistant_message = _openai_to_assistant_message_with_text_calls
 
+NSCALE_OVERFLOW_CHARS = 100_000
 MAX_TOKENS = int(os.environ["AGENTDOJO_MAX_TOKENS"]) if os.environ.get("AGENTDOJO_MAX_TOKENS") else NOT_GIVEN
 
 
@@ -121,16 +165,28 @@ def _chat_completion_request_with_max_tokens(
     client, model, messages, tools, reasoning_effort, temperature=0.0, stop=NOT_GIVEN
 ):
     """Same as `openai_llm.chat_completion_request`, plus the optional `max_tokens` cap and `stop`."""
-    completion = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        tools=tools or NOT_GIVEN,
-        tool_choice="auto" if tools else NOT_GIVEN,
-        temperature=temperature if temperature is not None else NOT_GIVEN,
-        reasoning_effort=reasoning_effort or NOT_GIVEN,
-        max_tokens=MAX_TOKENS,
-        stop=stop,
-    )
+    try:
+        completion = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools or NOT_GIVEN,
+            tool_choice="auto" if tools else NOT_GIVEN,
+            temperature=temperature if temperature is not None else NOT_GIVEN,
+            reasoning_effort=reasoning_effort or NOT_GIVEN,
+            max_tokens=MAX_TOKENS,
+            stop=stop,
+        )
+    except openai_llm.openai.BadRequestError as e:
+        chars = sum(len(json.dumps(m, default=str)) for m in messages)
+        nscale_overflow = "Failed to process request due to invalid parameters" in str(e) and chars > NSCALE_OVERFLOW_CHARS
+        if "maximum context length" in str(e) or nscale_overflow:
+            logging.warning("context length exceeded (%s request chars): %s", chars, e)
+            e.code = "context_length_exceeded"
+        raise
+    logger = Logger.get()
+    if isinstance(logger, TraceLogger) and completion.usage and "input_tokens" in logger.context:
+        logger.context["input_tokens"] += completion.usage.prompt_tokens or 0
+        logger.context["output_tokens"] += completion.usage.completion_tokens or 0
     choice = completion.choices[0]
     if choice.finish_reason == "length":
         reasoning = getattr(choice.message, "reasoning_content", None) or getattr(choice.message, "reasoning", None)
@@ -266,6 +322,64 @@ def _get_llm_prompting(provider, model, model_id, tool_delimiter):
 
 if os.environ.get("AGENTDOJO_PROMPTING") == "1":
     agent_pipeline.get_llm = _get_llm_prompting
+
+
+def _cli_option(name: str) -> str | None:
+    for i, arg in enumerate(sys.argv):
+        if arg == name and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        if arg.startswith(name + "="):
+            return arg.split("=", 1)[1]
+    return None
+
+
+def _git(*args: str) -> str:
+    repo = Path(__file__).resolve().parent.parent
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True).stdout.strip()
+
+
+# Schema ids of the models (notes/protocol.md 1.1), keyed by AgentDojo's --model / --model-id.
+MODEL_IDS = {
+    "gpt-4o-mini-2024-07-18": "gpt-4o-mini",
+    "Qwen/Qwen3-8B:nscale": "qwen3-8b",
+    "pllum-12b": "pllum-12b",
+    "bielik-11b-v3": "bielik-11b-v3",
+    "mistral-nemo": "mistral-nemo",
+}
+_model_id = _cli_option("--model-id") or (_cli_option("--model") or "").lower().replace("_", "-")
+RUN_METADATA = {
+    "task_lang": os.environ.get("AGENTDOJO_TASK_LANG", "en"),
+    "model": MODEL_IDS.get(_model_id),
+    "model_id": _model_id,
+    "tool_calling": "prompting" if os.environ.get("AGENTDOJO_PROMPTING") == "1" else "native",
+    "temperature": 0.0,
+    "max_tokens": MAX_TOKENS if MAX_TOKENS is not NOT_GIVEN else None,
+    "max_steps": 15,
+    "harness_commit": _git("rev-parse", "--short", "HEAD"),
+    "harness_dirty": bool(_git("status", "--porcelain", "--untracked-files=no")),
+}
+
+_pipeline_query = agent_pipeline.AgentPipeline.query
+
+
+def _pipeline_query_single_attempt(self, query, runtime, env=EmptyEnv(), messages=[], extra_args={}):
+    """Same as `AgentPipeline.query`, but refuses AgentDojo's retries: one agent run per logged task."""
+    logger = Logger.get()
+    if not isinstance(logger, TraceLogger):
+        return _pipeline_query(self, query, runtime, env, messages, extra_args)
+    if logger.context.get("attempts"):
+        if not logger.context.get("retry_skipped"):
+            logging.warning("AgentDojo retry skipped (run without final answer)")
+            logger.context["retry_skipped"] = True
+        error = AbortAgentError("retry skipped", [], env)
+        error.messages = list(logger.messages)  # without the assistant message AbortAgentError appends
+        raise error
+    logger.context["attempts"] = 1
+    logger.context.update(RUN_METADATA, input_tokens=0, output_tokens=0)
+    return _pipeline_query(self, query, runtime, env, messages, extra_args)
+
+
+agent_pipeline.AgentPipeline.query = _pipeline_query_single_attempt
 
 
 def _yaml_dump_unicode(data) -> str:

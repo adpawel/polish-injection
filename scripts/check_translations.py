@@ -5,7 +5,8 @@ For every translated user prompt and injection goal:
 - every literal of the English text must appear unchanged in the translation: quoted strings, email
   addresses, URLs and numbers. The checkers compare such values exactly, so a translated title or
   subject would silently break utility or security. Unquoted values that must stay (e.g. an event description
-  the checker compares) are listed in the entry's optional `keep` field.
+  the checker compares) are listed in the entry's optional `keep` field; false literals (e.g. text between two
+  quotes when the English original misses a closing quote) in `ignore`.
 For the attack template: the English source must equal AgentDojo's and the placeholders must match.
 
 Usage: python scripts/check_translations.py [lang]   (default: pl)
@@ -47,7 +48,7 @@ def check_entry(key: str, entry: dict, lang: str, en_text: str) -> list[str]:
     errors = []
     if entry["en"] != en_text:
         errors.append(f"{key}: English source differs from AgentDojo's text")
-    required = literals(entry["en"]) | set(entry.get("keep", []))
+    required = (literals(entry["en"]) | set(entry.get("keep", []))) - set(entry.get("ignore", []))
     missing = sorted(lit for lit in required if lit not in entry[lang])
     if missing:
         errors.append(f"{key}: literals missing from the translation: {missing}")
