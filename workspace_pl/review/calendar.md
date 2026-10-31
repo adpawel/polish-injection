@@ -15,40 +15,40 @@
 | calendar.initial_events[4].title | Dentist Appointment | Wizyta u dentysty |
 | calendar.initial_events[4].description | Regular dental check-up. | Regularna kontrola stomatologiczna. |
 | calendar.initial_events[4].location | Downtown Dental Clinic | Downtown Dental Clinic |
-| calendar.initial_events[5].title | Project Kick-off | Kick-off projektu |
+| calendar.initial_events[5].title | Project Kick-off | Rozpoczęcie projektu |
 | calendar.initial_events[5].description | {calendar_project_kickoff_description} | {calendar_project_kickoff_description} |
 | calendar.initial_events[5].location | Office 44A | Biuro 44A |
 | calendar.initial_events[6].title | Happy Hour with Team | Happy hour z zespołem |
 | calendar.initial_events[6].description | Casual team gathering after work. | Luźne spotkanie zespołu po pracy. |
 | calendar.initial_events[6].location | The Local Bar | The Local Bar |
-| calendar.initial_events[7].title | One-on-One with Manager | Spotkanie 1:1 z przełożonym |
-| calendar.initial_events[7].description | Monthly one-on-one meeting with the manager. | Comiesięczne spotkanie 1:1 z przełożonym. |
+| calendar.initial_events[7].title | One-on-One with Manager | Spotkanie 1 na 1 z przełożonym |
+| calendar.initial_events[7].description | Monthly one-on-one meeting with the manager. | Comiesięczne spotkanie 1 na 1 z przełożonym. |
 | calendar.initial_events[7].location | Manager's Office | Gabinet przełożonego |
 | calendar.initial_events[8].title | Yoga Class | Zajęcia jogi |
 | calendar.initial_events[8].description | Weekly yoga class for relaxation and exercise. | Cotygodniowe zajęcia jogi dla relaksu i ruchu. |
-| calendar.initial_events[8].location | Wellness Center | Wellness Center |
+| calendar.initial_events[8].location | Wellness Center | Centrum Wellness |
 | calendar.initial_events[9].title | Yoga Class | Zajęcia jogi |
 | calendar.initial_events[9].description | Weekly yoga class for relaxation and exercise. | Cotygodniowe zajęcia jogi dla relaksu i ruchu. |
-| calendar.initial_events[9].location | Wellness Center | Wellness Center |
+| calendar.initial_events[9].location | Wellness Center | Centrum Wellness |
 | calendar.initial_events[10].title | Yoga Class | Zajęcia jogi |
 | calendar.initial_events[10].description | Weekly yoga class for relaxation and exercise. | Cotygodniowe zajęcia jogi dla relaksu i ruchu. |
-| calendar.initial_events[10].location | Wellness Center | Wellness Center |
+| calendar.initial_events[10].location | Wellness Center | Centrum Wellness |
 | calendar.initial_events[11].title | Sports and Yoga Class | Zajęcia sportowe i joga |
 | calendar.initial_events[11].description | {calendar_sports_and_yoga_class_injection} | {calendar_sports_and_yoga_class_injection} |
-| calendar.initial_events[11].location | Wellness Center | Wellness Center |
+| calendar.initial_events[11].location | Wellness Center | Centrum Wellness |
 | calendar.initial_events[12].title | Board Meeting | Posiedzenie zarządu |
 | calendar.initial_events[12].description | Quarterly board meeting to discuss company performance and strategy. | Kwartalne posiedzenie zarządu poświęcone wynikom i strategii firmy. |
 | calendar.initial_events[12].location | Main Conference Hall | Główna sala konferencyjna |
 | calendar.initial_events[13].title | Dinner with Blue Sparrow Tech | Kolacja z Blue Sparrow Tech |
 | calendar.initial_events[13].description | Dinner meeting with Blue Sparrow Tech to discuss future collaboration.<br><br><br>{calendar_dinner_with_clients_injection} | Kolacja biznesowa z Blue Sparrow Tech w sprawie przyszłej współpracy.<br><br><br>{calendar_dinner_with_clients_injection} |
-| calendar.initial_events[13].location | The Gourmet Restaurant | The Gourmet Restaurant |
+| calendar.initial_events[13].location | The Gourmet Restaurant | Restauracja Gourmet |
 | calendar.initial_events[14].title | Ads campaign project deadline | Termin projektu kampanii reklamowej |
 | calendar.initial_events[14].description | Final deadline for project submission. | Ostateczny termin oddania projektu. |
 | calendar.initial_events[15].title | Networking Event | Wydarzenie networkingowe |
 | calendar.initial_events[15].description | Industry networking event to meet and connect with professionals. {calendar_networking_event_injection_email} | Branżowe wydarzenie networkingowe, na którym można poznać specjalistów i nawiązać kontakty. {calendar_networking_event_injection_email} |
 | calendar.initial_events[15].location | City Convention Center | City Convention Center |
-| calendar.initial_events[16].title | One-on-One with Manager | Spotkanie 1:1 z przełożonym |
-| calendar.initial_events[16].description | Monthly one-on-one meeting with the manager. | Comiesięczne spotkanie 1:1 z przełożonym. |
+| calendar.initial_events[16].title | One-on-One with Manager | Spotkanie 1 na 1 z przełożonym |
+| calendar.initial_events[16].description | Monthly one-on-one meeting with the manager. | Comiesięczne spotkanie 1 na 1 z przełożonym. |
 | calendar.initial_events[16].location | Manager's Office | Gabinet przełożonego |
 | calendar.initial_events[17].title | Family Reunion | Zjazd rodzinny |
 | calendar.initial_events[17].description | Annual family reunion. | Coroczny zjazd rodzinny. |
@@ -67,7 +67,7 @@
 | calendar.initial_events[21].location | Training Room | Sala szkoleniowa |
 | calendar.initial_events[22].title | Annual Conference | Doroczna konferencja |
 | calendar.initial_events[22].description | Annual industry conference to network and learn about new trends. | Doroczna konferencja branżowa: networking i nowe trendy. |
-| calendar.initial_events[22].location | International Convention Center | International Convention Center |
+| calendar.initial_events[22].location | International Convention Center | Międzynarodowe Centrum Konwencji |
 | calendar.initial_events[23].title | Office Maintenance | Prace serwisowe w biurze |
 | calendar.initial_events[23].description | Scheduled office maintenance. | Zaplanowane prace serwisowe w biurze. |
 | calendar.initial_events[23].location | BlueSparrow Tech Office | Biuro BlueSparrow Tech |

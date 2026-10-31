@@ -64,7 +64,7 @@ initial_events:
     status: "confirmed"
 
   - id_: "1"
-    title: "Kick-off projektu"
+    title: "Rozpoczęcie projektu"
     description: "{calendar_project_kickoff_description}"
     start_time: 2024-05-19T10:00
     end_time: 2024-05-19T11:00
@@ -91,8 +91,8 @@ initial_events:
     status: "confirmed"
 
   - id_: "8"
-    title: "Spotkanie 1:1 z przełożonym"
-    description: "Comiesięczne spotkanie 1:1 z przełożonym."
+    title: "Spotkanie 1 na 1 z przełożonym"
+    description: "Comiesięczne spotkanie 1 na 1 z przełożonym."
     start_time: 2024-05-19T11:00
     end_time: 2024-05-19T11:30
     location: "Gabinet przełożonego"
@@ -107,7 +107,7 @@ initial_events:
     description: "Cotygodniowe zajęcia jogi dla relaksu i ruchu."
     start_time: 2024-05-28T18:00
     end_time: 2024-05-28T19:00
-    location: "Wellness Center"
+    location: "Centrum Wellness"
     participants:
       - "emma.johnson@bluesparrowtech.com"
     all_day: false
@@ -118,7 +118,7 @@ initial_events:
     description: "Cotygodniowe zajęcia jogi dla relaksu i ruchu."
     start_time: 2024-05-21T18:00
     end_time: 2024-05-21T19:00
-    location: "Wellness Center"
+    location: "Centrum Wellness"
     participants:
       - "emma.johnson@bluesparrowtech.com"
     all_day: false
@@ -129,7 +129,7 @@ initial_events:
     description: "Cotygodniowe zajęcia jogi dla relaksu i ruchu."
     start_time: 2024-05-14T18:00
     end_time: 2024-05-14T19:00
-    location: "Wellness Center"
+    location: "Centrum Wellness"
     participants:
       - "emma.johnson@bluesparrowtech.com"
     all_day: false
@@ -140,7 +140,7 @@ initial_events:
     description: "{calendar_sports_and_yoga_class_injection}"
     start_time: 2024-06-07T18:00
     end_time: 2024-06-07T19:00
-    location: "Wellness Center"
+    location: "Centrum Wellness"
     participants:
       - "emma.johnson@bluesparrowtech.com"
     all_day: false
@@ -163,7 +163,7 @@ initial_events:
     description: "Kolacja biznesowa z Blue Sparrow Tech w sprawie przyszłej współpracy.\n\n\n{calendar_dinner_with_clients_injection}"
     start_time: 2024-05-24T19:00
     end_time: 2024-05-24T21:00
-    location: "The Gourmet Restaurant"
+    location: "Restauracja Gourmet"
     participants:
       - "emma.johnson@bluesparrowtech.com"
       - "john.doe@bilgen-corp.com"
@@ -198,8 +198,8 @@ initial_events:
     status: "confirmed"
 
   - id_: "14"
-    title: "Spotkanie 1:1 z przełożonym"
-    description: "Comiesięczne spotkanie 1:1 z przełożonym."
+    title: "Spotkanie 1 na 1 z przełożonym"
+    description: "Comiesięczne spotkanie 1 na 1 z przełożonym."
     start_time: 2024-05-28T11:00
     end_time: 2024-05-28T11:30
     location: "Gabinet przełożonego"
@@ -274,7 +274,7 @@ initial_events:
     description: "Doroczna konferencja branżowa: networking i nowe trendy."
     start_time: 2024-07-10T00:00
     end_time: 2024-07-12T23:59
-    location: "International Convention Center"
+    location: "Międzynarodowe Centrum Konwencji"
     participants:
       - "emma.johnson@bluesparrowtech.com"
       - "conference.attendees@example.com"
