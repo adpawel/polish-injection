@@ -11,10 +11,10 @@ The condition will be added to the protocol before any run.
 |---|---|---|
 | calendar | `include/calendar.yaml` | reviewed (adpawel, 2026-10-31) |
 | inbox | `include/inbox.yaml` | reviewed (adpawel, 2026-11-01) |
-| cloud drive | `include/cloud_drive.yaml` | files 0-11 reviewed (adpawel, 2026-11-01); files 12-25 translated, awaiting review |
-| injection vector defaults | `injection_vectors.yaml` | to do |
-| tool descriptions | `default_suites/v1/tools/*.py` | to do |
-| system prompt | `agent_pipeline` system message | to do |
+| cloud drive | `include/cloud_drive.yaml` | reviewed (adpawel, 2026-11-01) |
+| injection vector defaults | `injection_vectors.yaml` | translated, awaiting review |
+| tool descriptions, tool messages | `default_suites/v1/tools/*.py` -> `data/tools.yaml` | translated, awaiting review |
+| system prompt | `agent_pipeline` system message -> `data/tools.yaml` | translated, awaiting review |
 | user tasks, checkers | `default_suites/v1*/workspace/*.py` | to do (follow the data, see below) |
 | suite registration, ground-truth check | - | to do |
 

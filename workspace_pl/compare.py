@@ -3,7 +3,10 @@
 The translation may change only the free-text fields (TEXT_FIELDS); everything else (ids, dates, addresses,
 statuses, structure) must be identical, and every `{placeholder}` of an injection vector must survive unchanged.
 
-Usage: python workspace_pl/compare.py calendar [-o review.md]
+`tools` is checked differently: data/tools.yaml holds en/pl pairs, and the `en` texts are compared with the
+installed package (system prompt, tool and parameter descriptions, messages in the tool sources).
+
+Usage: python workspace_pl/compare.py calendar|inbox|cloud_drive|injection_vectors|tools [-o review.md]
 """
 
 import argparse
@@ -15,10 +18,49 @@ import yaml
 
 import agentdojo
 
-ORIGINAL = Path(agentdojo.__file__).parent / "data" / "suites" / "workspace" / "include"
+SUITE_DATA = Path(agentdojo.__file__).parent / "data" / "suites" / "workspace"
+ORIGINAL = {
+    "calendar": SUITE_DATA / "include" / "calendar.yaml",
+    "inbox": SUITE_DATA / "include" / "inbox.yaml",
+    "cloud_drive": SUITE_DATA / "include" / "cloud_drive.yaml",
+    "injection_vectors": SUITE_DATA / "injection_vectors.yaml",
+}
+TOOL_SOURCES = Path(agentdojo.__file__).parent / "default_suites" / "v1" / "tools"
 TRANSLATED = Path(__file__).parent / "data"
-TEXT_FIELDS = {"title", "description", "location", "subject", "body", "filename", "content"}
+TEXT_FIELDS = {"title", "description", "location", "subject", "body", "filename", "content", "default"}
 PLACEHOLDER = re.compile(r"\{[a-z0-9_]+\}")
+FORMAT_FIELD = re.compile(r"\{[^{}]*\}")
+
+
+def check_tools(pl_data: dict, errors: list, rows: list) -> None:
+    from agentdojo.agent_pipeline.agent_pipeline import load_system_message
+    from agentdojo.task_suite.load_suites import get_suite
+
+    def pair(path, texts, original):
+        if original is not None and texts["en"].strip() != original.strip():
+            errors.append(f"{path}: `en` differs from the package")
+        if sorted(FORMAT_FIELD.findall(texts["en"])) != sorted(FORMAT_FIELD.findall(texts["pl"])):
+            errors.append(f"{path}: format fields differ")
+        rows.append((path, texts["en"], texts["pl"]))
+
+    pair("system_prompt", pl_data["system_prompt"], load_system_message(None))
+    tools = {f.name: f for f in get_suite("v1.2.2", "workspace").tools}
+    if set(tools) != set(pl_data["tools"]):
+        errors.append(f"tools differ: {sorted(set(tools) ^ set(pl_data['tools']))}")
+    for name, entry in pl_data["tools"].items():
+        if name not in tools:
+            continue
+        pair(f"{name}.description", entry["description"], tools[name].description)
+        properties = tools[name].parameters.model_json_schema()["properties"]
+        if set(properties) != set(entry.get("params", {})):
+            errors.append(f"{name}: parameters differ")
+        for param, texts in entry.get("params", {}).items():
+            pair(f"{name}.{param}", texts, properties.get(param, {}).get("description"))
+    sources = "".join(p.read_text(encoding="utf-8") for p in TOOL_SOURCES.glob("*.py"))
+    for i, texts in enumerate(pl_data["messages"]):
+        pair(f"messages[{i}]", texts, None)
+        if texts["en"] not in sources:
+            errors.append(f"messages[{i}]: not found in the tool sources")
 
 
 def walk(en, pl, path, errors, rows):
@@ -48,14 +90,17 @@ def cell(text: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("name", help="calendar | inbox | cloud_drive")
+    parser.add_argument("name", choices=[*ORIGINAL, "tools"])
     parser.add_argument("-o", "--output", type=Path)
     parser.add_argument("--translated-only", action="store_true", help="leave unchanged fields out of the table")
     args = parser.parse_args()
-    en = yaml.safe_load((ORIGINAL / f"{args.name}.yaml").read_text(encoding="utf-8"))
     pl = yaml.safe_load((TRANSLATED / f"{args.name}.yaml").read_text(encoding="utf-8"))
     errors, rows = [], []
-    walk(en, pl, args.name, errors, rows)
+    if args.name == "tools":
+        check_tools(pl, errors, rows)
+    else:
+        en = yaml.safe_load(ORIGINAL[args.name].read_text(encoding="utf-8"))
+        walk(en, pl, args.name, errors, rows)
     if args.output:
         lines = ["| field | EN | PL |", "|---|---|---|"]
         lines += [
