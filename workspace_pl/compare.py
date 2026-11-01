@@ -50,6 +50,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("name", help="calendar | inbox | cloud_drive")
     parser.add_argument("-o", "--output", type=Path)
+    parser.add_argument("--translated-only", action="store_true", help="leave unchanged fields out of the table")
     args = parser.parse_args()
     en = yaml.safe_load((ORIGINAL / f"{args.name}.yaml").read_text(encoding="utf-8"))
     pl = yaml.safe_load((TRANSLATED / f"{args.name}.yaml").read_text(encoding="utf-8"))
@@ -57,10 +58,22 @@ def main() -> None:
     walk(en, pl, args.name, errors, rows)
     if args.output:
         lines = ["| field | EN | PL |", "|---|---|---|"]
-        lines += [f"| {cell(path)} | {cell(a)} | {cell(b)} |" for path, a, b in rows]
+        lines += [
+            f"| {cell(path)} | {cell(a)} | {cell(b)} |"
+            for path, a, b in rows
+            if not (args.translated_only and a == b)
+        ]
         args.output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     untranslated = sum(a == b for _, a, b in rows)
     print(f"{len(rows)} text fields, {untranslated} left unchanged, {len(errors)} errors")
+    if args.name == "cloud_drive":
+        # "the largest file" tasks name the file in their checker; size is len(content) (placeholders included)
+        ranking = [
+            [f["id_"] for f in sorted(data["initial_files"], key=lambda f: -len(f["content"]))] for data in (en, pl)
+        ]
+        print(f"largest files EN {ranking[0][:6]}, PL {ranking[1][:6]}")
+        if ranking[0][0] != ranking[1][0]:
+            errors.append("the largest file is not the same")
     for error in errors:
         print("  " + error)
     sys.exit(1 if errors else 0)
