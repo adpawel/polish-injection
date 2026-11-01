@@ -15,7 +15,8 @@ The condition will be added to the protocol before any run.
 | injection vector defaults | `injection_vectors.yaml` | reviewed (adpawel, 2026-11-01) |
 | tool descriptions, tool messages | `default_suites/v1/tools/*.py` -> `data/tools.yaml` | reviewed (adpawel, 2026-11-01) |
 | system prompt | `agent_pipeline` system message -> `data/tools.yaml` | reviewed (adpawel, 2026-11-01) |
-| user tasks, checkers | `default_suites/v1*/workspace/*.py` | to do (follow the data, see below) |
+| user task texts | `data/pl/workspace.json` -> `data/tasks.json` | translated, awaiting review |
+| checkers | `default_suites/v1*/workspace/*.py` | to do (follow the data, see below) |
 | suite registration, ground-truth check | - | to do |
 
 ## Translation rules
