@@ -17,6 +17,8 @@
 # moved to runs/full/_cutoff/ (kept for the record) and the run is made again when its part is next run.
 # The harness must be committed: the logs record the commit and export_results.py rejects dirty runs.
 # vLLM models read VLLM_BASE_URL / VLLM_API_KEY from .env; the matching server must be running (notes/runpod.md).
+# SUITE=workspace_pl runs the fully Polish workspace (workspace_pl/README.md) instead; its logs go to
+# runs/workspace_pl/<model>-<task_lang>.
 # Run from the repository root in Git Bash.
 set -euo pipefail
 
@@ -25,7 +27,7 @@ INJECTION_TASKS=(0 1 2 3 4 5 6 10 11 13)
 PY=.venv/Scripts/python.exe
 
 if [ $# -lt 3 ]; then
-    sed -n '2,19p' "$0"
+    sed -n '2,21p' "$0"
     exit 2
 fi
 model=$1 task_lang=$2 payload=$3
@@ -47,14 +49,24 @@ set -a
 . ./.env
 set +a
 export AGENTDOJO_MAX_TOKENS=4096 AGENTDOJO_TASK_LANG=$task_lang PYTHONIOENCODING=utf-8
-args=(-s workspace --logdir "runs/full/$model-$task_lang")
+suite=${SUITE:-workspace}
+case $suite in
+    workspace) base=runs/full ;;
+    workspace_pl) base=runs/workspace_pl ;;
+    *) echo "unknown SUITE: $suite" >&2; exit 2 ;;
+esac
+args=(-s "$suite" --logdir "$base/$model-$task_lang")
 
 case $model in
     gpt-4o-mini)
         args+=(--model GPT_4O_MINI_2024_07_18) ;;
     qwen3-8b)
         export AGENTDOJO_SYSTEM_ROLE=1
-        system="$($PY -c 'from agentdojo.agent_pipeline.agent_pipeline import load_system_message; print(load_system_message(None)+" /no_think", end="")')"
+        if [ "$suite" = workspace_pl ]; then
+            system="$($PY -c 'from workspace_pl.suite import SYSTEM_PROMPT_PL; print(SYSTEM_PROMPT_PL+" /no_think", end="")')"
+        else
+            system="$($PY -c 'from agentdojo.agent_pipeline.agent_pipeline import load_system_message; print(load_system_message(None)+" /no_think", end="")')"
+        fi
         args+=(--model OPENAI_COMPATIBLE --model-id "Qwen/Qwen3-8B:nscale" --system-message "$system") ;;
     pllum-12b|mistral-nemo|bielik-11b-v3)
         export OPENAI_COMPATIBLE_BASE_URL="$VLLM_BASE_URL" OPENAI_COMPATIBLE_API_KEY="$VLLM_API_KEY"
@@ -82,11 +94,11 @@ if [ "$payload" != none ]; then
     done
 fi
 
-mkdir -p runs/full
-log="runs/full/$model-$task_lang-$payload.log"
+mkdir -p "$base"
+log="$base/$model-$task_lang-$payload.log"
 stamp=$(date '+%Y%m%d-%H%M%S')
-for file in $(grep -L '"security"' runs/full/"$model-$task_lang"/*/workspace/*/*/*.json 2>/dev/null || true); do
-    target="runs/full/_cutoff/$stamp/${file#runs/full/}"
+for file in $(grep -L '"security"' "$base/$model-$task_lang"/*/"$suite"/*/*/*.json 2>/dev/null || true); do
+    target="$base/_cutoff/$stamp/${file#$base/}"
     mkdir -p "$(dirname "$target")"
     mv "$file" "$target"
     echo "$(date '+%F %T') cut-off run moved to $target" >> "$log"

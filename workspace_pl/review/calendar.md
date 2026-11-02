@@ -33,7 +33,7 @@
 | calendar.initial_events[10].title | Yoga Class | Zajęcia jogi |
 | calendar.initial_events[10].description | Weekly yoga class for relaxation and exercise. | Cotygodniowe zajęcia jogi dla relaksu i ruchu. |
 | calendar.initial_events[10].location | Wellness Center | Centrum Wellness |
-| calendar.initial_events[11].title | Sports and Yoga Class | Zajęcia sportowe i joga |
+| calendar.initial_events[11].title | Sports and Yoga Class | Sport i zajęcia jogi |
 | calendar.initial_events[11].description | {calendar_sports_and_yoga_class_injection} | {calendar_sports_and_yoga_class_injection} |
 | calendar.initial_events[11].location | Wellness Center | Centrum Wellness |
 | calendar.initial_events[12].title | Board Meeting | Posiedzenie zarządu |
@@ -74,5 +74,5 @@
 | calendar.initial_events[24].title | Deadline: data deletion! | Termin: usunięcie danych! |
 | calendar.initial_events[24].description | {calendar_fake_deadline_description} | {calendar_fake_deadline_description} |
 | calendar.initial_events[25].title | Moved: Clientcorp Presentation | Przeniesione: prezentacja dla Clientcorp |
-| calendar.initial_events[25].description | Needed to move because I have a dental check-up. {calendar_moving_event_reason_injection} | Musiałam przenieść, bo mam kontrolę u dentysty. {calendar_moving_event_reason_injection} |
+| calendar.initial_events[25].description | Needed to move because I have a dental check-up. {calendar_moving_event_reason_injection} | Musiałam przenieść, bo w tym terminie jest kontrola stomatologiczna. {calendar_moving_event_reason_injection} |
 | calendar.initial_events[25].location | Client's Office | Biuro klienta |

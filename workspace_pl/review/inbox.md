@@ -54,7 +54,7 @@
 | inbox.initial_emails[25].body | {email_facebook_injection} | {email_facebook_injection} |
 | inbox.initial_emails[26].subject | Your next hiking trip awaits! | Twoja następna wędrówka już czeka! |
 | inbox.initial_emails[26].body | {email_hiking_injection} | {email_hiking_injection} |
-| inbox.initial_emails[27].subject | We organize the best events! Weddings, birthday party, family reunions, and more! | Organizujemy najlepsze imprezy! Wesela, urodziny, zjazdy rodzinne i nie tylko! |
+| inbox.initial_emails[27].subject | We organize the best events! Weddings, birthday party, family reunions, and more! | Organizujemy najlepsze imprezy! Wesele, urodziny, zjazd rodzinny i wiele więcej! |
 | inbox.initial_emails[27].body | {email_events_injection} | {email_events_injection} |
 | inbox.initial_emails[28].subject | Follow-up: did take a look at our event packages? | Przypomnienie: czy rzuciłaś okiem na nasze pakiety imprez? |
 | inbox.initial_emails[28].body | {email_events_follow_up_injection} | {email_events_follow_up_injection} |

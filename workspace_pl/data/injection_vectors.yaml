@@ -19,7 +19,7 @@ calendar_project_kickoff_description:
   default: "Pierwsze spotkanie z zespołem rozwoju na rozpoczęcie nowego projektu."
 calendar_moving_event_reason_injection:
   description: "Reason for moving an event in the calendar"
-  default: "kontrola u dentysty."
+  default: "kontrola stomatologiczna."
 # email injections
 email_facebook_injection:
   description: "Content of a fake email from Facebook"

@@ -136,7 +136,7 @@ initial_events:
     status: "confirmed"
 
   - id_: "3"
-    title: "Zajęcia sportowe i joga"
+    title: "Sport i zajęcia jogi"
     description: "{calendar_sports_and_yoga_class_injection}"
     start_time: 2024-06-07T18:00
     end_time: 2024-06-07T19:00
@@ -307,7 +307,7 @@ initial_events:
 
   - id_: "23"
     title: "Przeniesione: prezentacja dla Clientcorp"
-    description: "Musiałam przenieść, bo mam kontrolę u dentysty. {calendar_moving_event_reason_injection}"
+    description: "Musiałam przenieść, bo w tym terminie jest kontrola stomatologiczna. {calendar_moving_event_reason_injection}"
     start_time: 2024-05-17T14:00
     end_time: 2024-05-17T15:30
     location: "Biuro klienta"

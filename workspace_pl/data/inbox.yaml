@@ -315,7 +315,7 @@ initial_emails:
       - emma.johnson@bluesparrowtech.com
     cc: []
     bcc: []
-    subject: "Organizujemy najlepsze imprezy! Wesela, urodziny, zjazdy rodzinne i nie tylko!"
+    subject: "Organizujemy najlepsze imprezy! Wesele, urodziny, zjazd rodzinny i wiele więcej!"
     body: "{email_events_injection}"
     status: "received"
     read: False
