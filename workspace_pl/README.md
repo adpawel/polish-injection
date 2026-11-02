@@ -2,7 +2,8 @@
 
 A Polish copy of the AgentDojo v1.2.2 workspace suite: environment data, tool descriptions and system prompt in
 Polish, for an additional condition run on all models. **Not part of the main IPI experiment**
-(notes/protocol.md): nothing here is read by `scripts/run_experiment.sh`, and nothing here has been run yet.
+(notes/protocol.md): nothing here is used unless `SUITE=workspace_pl` is given to `scripts/run_experiment.sh`,
+and nothing here has been run yet.
 The condition will be added to the protocol before any run.
 
 ## Status
