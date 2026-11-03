@@ -18,7 +18,7 @@
 # The harness must be committed: the logs record the commit and export_results.py rejects dirty runs.
 # vLLM models read VLLM_BASE_URL / VLLM_API_KEY from .env; the matching server must be running (notes/runpod.md).
 # SUITE=workspace_pl runs the fully Polish workspace (workspace_pl/README.md) instead; its logs go to
-# runs/workspace_pl/<model>-<task_lang>.
+# runs/workspace_pl/<model>-pl (task_lang must be pl).
 # Run from the repository root in Git Bash.
 set -euo pipefail
 
@@ -52,7 +52,10 @@ export AGENTDOJO_MAX_TOKENS=4096 AGENTDOJO_TASK_LANG=$task_lang PYTHONIOENCODING
 suite=${SUITE:-workspace}
 case $suite in
     workspace) base=runs/full ;;
-    workspace_pl) base=runs/workspace_pl ;;
+    workspace_pl)
+        base=runs/workspace_pl
+        # the user tasks are adapted to the Polish data; the English ones would search for English texts
+        [ "$task_lang" = pl ] || { echo "SUITE=workspace_pl needs task_lang pl" >&2; exit 2; } ;;
     *) echo "unknown SUITE: $suite" >&2; exit 2 ;;
 esac
 args=(-s "$suite" --logdir "$base/$model-$task_lang")

@@ -88,7 +88,9 @@ The search tool matches the query as a substring of the file content, and the gr
 ## Suite (`suite.py`)
 
 `import workspace_pl.suite` registers `workspace_pl` for v1.2.2 (done by `scripts/run_agentdojo.py` when it is
-called with `-s workspace_pl`; `SUITE=workspace_pl scripts/run_experiment.sh ...` does that).
+called with `-s workspace_pl`; `SUITE=workspace_pl scripts/run_experiment.sh <model> pl <pl|en|none> ...` does
+that, Polish tasks only). Logs: `runs/workspace_pl/<model>-pl`; `scripts/export_results.py` and
+`scripts/analyse.py` read them as the configurations `PLenv/PL` and `PLenv/EN` (notes/protocol.md 2.5).
 
 - Data are read as UTF-8 (AgentDojo reads suite files with the platform encoding).
 - Tools: Polish descriptions; error messages and the emails the calendar tools send are translated with the
