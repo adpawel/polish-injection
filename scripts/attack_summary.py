@@ -46,6 +46,9 @@ def text(message: dict) -> str:
 
 def replay_security(log: dict, dedup: bool) -> bool:
     """Replays the logged tool calls on a fresh environment and applies the injection task's checker."""
+    if log["suite_name"] == "workspace_pl":
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        import workspace_pl.suite  # noqa: F401  (registers the suite)
     suite = get_suite(BENCHMARK_VERSION, log["suite_name"])
     user_task = suite.get_user_task_by_id(log["user_task_id"])
     injection_task = suite.get_injection_task_by_id(log["injection_task_id"])
