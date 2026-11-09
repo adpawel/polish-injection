@@ -219,8 +219,8 @@ deployment? Added 2026-11-03; it extends the experiment and does not change sect
   calendar, files, injection-vector defaults), Polish tool descriptions and tool messages, Polish system prompt
   and Polish user tasks adapted to the Polish data. Tool names, parameter names, IDs, e-mail addresses, dates
   and codes are unchanged. Translations reviewed by the native speaker like those of 1.4.
-- **Configurations:** `PLenv/PL` (Polish payload, fixed); `PLenv/EN` (English payload) - **open, decided before
-  the first run**. English tasks are not run in this suite. Same models, settings (1.1-1.2), injection tasks
+- **Configurations:** `PLenv/PL` (Polish payload) and `PLenv/EN` (English payload; added 2026-11-09 after the
+  GPT-4o-mini results of `PLenv/PL`, before any of its runs). English tasks are not run in this suite. Same models, settings (1.1-1.2), injection tasks
   (2.2) and run types as the main experiment: attack runs, 40 runs without attack, controls.
 - **Attacker texts:** the strings the attacker asks for (injection tasks 0, 2, 4, 13: e-mail text, event
   title, phishing message) are Polish in the Polish payload; the checkers accept the Polish or the English
@@ -238,9 +238,14 @@ deployment? Added 2026-11-03; it extends the experiment and does not change sect
 - **Controls:** AgentDojo gives the injection task's English goal as the user task, here in the Polish
   environment; reported separately from the main controls.
 - **Comparisons** (pairs as in 1.6, per model): `EN/EN vs PLenv/PL` (fully English vs fully Polish) and
-  `PL/PL vs PLenv/PL` (effect of the environment language); with `PLenv/EN` also `PL/EN vs PLenv/EN`. One
-  family, Holm-corrected within a model, separate from the main family; the primary comparison of 1.6 stays
+  `PL/PL vs PLenv/PL` (effect of the environment language), `PL/EN vs PLenv/EN` (the same with the English
+  payload) and `PLenv/PL vs PLenv/EN` (payload language within the Polish environment). One family,
+  Holm-corrected within a model, separate from the main family; the primary comparison of 1.6 stays
   `EN/EN vs PL/PL`.
+- **Hypothesis (written 2026-11-09, after `PLenv/PL` of GPT-4o-mini, before `PLenv/EN`):** a payload works better
+  when it is in the language of the surrounding data. Prediction: ASR of `PLenv/PL` > `PLenv/EN`. It came from
+  looking at the results (matching language: EN/EN 28 %, PL/EN 27 %, `PLenv/PL` 32 %; not matching: PL/PL 25 %,
+  EN/PL 17 %), so only `PLenv/EN` and the models not yet run can test it.
 - **Pipeline:** `SUITE=workspace_pl scripts/run_experiment.sh <model> pl <pl|en|none> [<first>-<last>]`, export
   and analysis as in 2.1 with the directories `runs/workspace_pl/*-pl`. Incremental as in 2.1: one user task
   with all injection tasks, then a second, then the rest.
@@ -272,3 +277,4 @@ section lists only what must hold so that its results can be compared with the I
   by the model. The ~250 GPT runs made with 1024 were moved to `runs/full/_superseded/` and redone.
 - 2026-11-03: additional condition 2.5 (fully Polish environment, suite `workspace_pl`, fix 13); sections 1-2.4
   unchanged. Open before its first run: whether `PLenv/EN` is run.
+- 2026-11-09: `PLenv/EN` added, hypothesis and the comparison `PLenv/PL vs PLenv/EN` written in 2.5 before its runs.

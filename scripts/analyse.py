@@ -31,7 +31,7 @@ from pathlib import Path
 CONFIGS = ["EN/EN", "EN/PL", "PL/EN", "PL/PL"]
 PRIMARY = ("EN/EN", "PL/PL")
 # notes/protocol.md 2.5: fully Polish vs fully English, and the effect of the environment language
-ENV_COMPARISONS = [("EN/EN", "PLenv/PL"), ("PL/PL", "PLenv/PL"), ("PL/EN", "PLenv/EN")]
+ENV_COMPARISONS = [("EN/EN", "PLenv/PL"), ("PL/PL", "PLenv/PL"), ("PL/EN", "PLenv/EN"), ("PLenv/PL", "PLenv/EN")]
 SAFE_RISK = {"none", "low"}
 MIN_DISCORDANT = 6
 
