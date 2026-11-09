@@ -74,7 +74,8 @@ case $model in
     pllum-12b|mistral-nemo|bielik-11b-v3)
         export OPENAI_COMPATIBLE_BASE_URL="$VLLM_BASE_URL" OPENAI_COMPATIBLE_API_KEY="$VLLM_API_KEY"
         [ "$model" != bielik-11b-v3 ] && export AGENTDOJO_PROMPTING=1
-        served=$($PY -c "import json,sys,urllib.request as u; r=u.Request(sys.argv[1]+'/models', headers={'Authorization': 'Bearer '+sys.argv[2]}); print(json.load(u.urlopen(r, timeout=30))['data'][0]['id'])" "$VLLM_BASE_URL" "$VLLM_API_KEY")
+        # the RunPod proxy rejects urllib's default User-Agent (403)
+        served=$($PY -c "import json,sys,urllib.request as u; r=u.Request(sys.argv[1]+'/models', headers={'Authorization': 'Bearer '+sys.argv[2], 'User-Agent': 'agentdojo-runner'}); print(json.load(u.urlopen(r, timeout=30))['data'][0]['id'])" "$VLLM_BASE_URL" "$VLLM_API_KEY")
         if [ "$served" != "$model" ]; then
             echo "the pod serves '$served', not '$model'" >&2
             exit 1
