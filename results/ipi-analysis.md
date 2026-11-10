@@ -1,5 +1,9 @@
 | track | model | config | runs | exposure | ASR dedup / exposed [95 % CI] | raw ASR | utility (no attack) | utility (attack) | no output | overflow |
 |---|---|---|---|---|---|---|---|---|---|---|
+| ipi | bielik-11b-v3 | EN/EN | 400 | 210/400 (52%) | 25/210 (12%) [8%, 17%] | 23/400 (6%) | 4/24 (17%) | 39/240 (16%) | 39 | 20 |
+| ipi | bielik-11b-v3 | EN/PL | 400 | 200/400 (50%) | 6/200 (3%) [1%, 6%] | 6/400 (2%) | 4/24 (17%) | 55/240 (23%) | 30 | 20 |
+| ipi | bielik-11b-v3 | PL/EN | 400 | 110/400 (28%) | 5/110 (5%) [2%, 10%] | 5/400 (1%) | 2/24 (8%) | 30/240 (12%) | 9 | 7 |
+| ipi | bielik-11b-v3 | PL/PL | 400 | 111/400 (28%) | 5/111 (5%) [2%, 10%] | 5/400 (1%) | 2/24 (8%) | 30/240 (12%) | 8 | 8 |
 | ipi | gpt-4o-mini | EN/EN | 400 | 380/400 (95%) | 107/380 (28%) [24%, 33%] | 107/400 (27%) | 20/24 (83%) | 84/240 (35%) | 5 | 0 |
 | ipi | gpt-4o-mini | EN/PL | 400 | 380/400 (95%) | 63/380 (17%) [13%, 21%] | 63/400 (16%) | 20/24 (83%) | 128/240 (53%) | 3 | 0 |
 | ipi | gpt-4o-mini | PL/EN | 400 | 390/400 (98%) | 105/390 (27%) [23%, 32%] | 105/400 (26%) | 18/24 (75%) | 89/240 (37%) | 4 | 0 |
@@ -10,20 +14,27 @@
 | ipi | qwen3-8b | PL/PL | 400 | 266/400 (66%) | 12/266 (5%) [3%, 8%] | 12/400 (3%) | 7/24 (29%) | 57/240 (24%) | 35 | 14 |
 
 Control (injection task given as the user task):
-- ipi / gpt-4o-mini: 7/10 solved
-- ipi / qwen3-8b: 4/10 solved
+- ipi / bielik-11b-v3 / workspace: 3/10 solved
+- ipi / gpt-4o-mini / workspace: 7/10 solved
+- ipi / qwen3-8b / workspace: 4/10 solved
 
 | track | model | comparison | exposed pairs | only A / only B | ASR A - B [95 % CI] | p | p (Holm) |
 |---|---|---|---|---|---|---|---|
+| ipi | bielik-11b-v3 | EN/EN vs EN/PL | 195 | 18 / 1 | +8.7% [+4.3%, +13.1%] | 7.63e-05 | 0.000229 |
+| ipi | bielik-11b-v3 | EN/EN vs PL/EN | 98 | 7 / 2 | +5.1% [+1.0%, +9.2%] | 0.18 | 0.359 |
+| ipi | bielik-11b-v3 | EN/EN vs PL/PL (primary) | 98 | 8 / 2 | +6.1% [+1.0%, +11.0%] | 0.109 | - |
+| ipi | bielik-11b-v3 | EN/PL vs PL/EN | 95 | 0 / 4 | -4.2% [-7.4%, -1.1%] | n/a | n/a |
+| ipi | bielik-11b-v3 | EN/PL vs PL/PL | 95 | 0 / 2 | -2.1% [-5.0%, +0.0%] | n/a | n/a |
+| ipi | bielik-11b-v3 | PL/EN vs PL/PL | 110 | 4 / 4 | +0.0% [-4.5%, +3.6%] | 1 | 1 |
 | ipi | gpt-4o-mini | EN/EN vs EN/PL | 380 | 57 / 13 | +11.6% [+7.1%, +16.1%] | 1.03e-07 | 5.14e-07 |
 | ipi | gpt-4o-mini | EN/EN vs PL/EN | 379 | 24 / 21 | +0.8% [-3.2%, +5.3%] | 0.766 | 0.766 |
-| ipi | gpt-4o-mini | EN/EN vs PL/PL (primary) | 377 | 37 / 25 | +3.2% [-1.9%, +8.6%] | 0.162 | - |
-| ipi | gpt-4o-mini | EN/PL vs PL/EN | 379 | 15 / 56 | -10.8% [-16.4%, -5.5%] | 1.04e-06 | 4.17e-06 |
+| ipi | gpt-4o-mini | EN/EN vs PL/PL (primary) | 377 | 37 / 25 | +3.2% [-1.9%, +8.7%] | 0.162 | - |
+| ipi | gpt-4o-mini | EN/PL vs PL/EN | 379 | 15 / 56 | -10.8% [-16.1%, -5.5%] | 1.04e-06 | 4.17e-06 |
 | ipi | gpt-4o-mini | EN/PL vs PL/PL | 377 | 14 / 46 | -8.5% [-13.5%, -3.2%] | 4.22e-05 | 0.000127 |
-| ipi | gpt-4o-mini | PL/EN vs PL/PL | 386 | 34 / 26 | +2.1% [-2.8%, +7.1%] | 0.366 | 0.733 |
-| ipi | qwen3-8b | EN/EN vs EN/PL | 330 | 9 / 4 | +1.5% [-1.2%, +3.9%] | 0.267 | 1 |
-| ipi | qwen3-8b | EN/EN vs PL/EN | 239 | 2 / 4 | -0.8% [-2.9%, +0.9%] | 0.688 | 1 |
+| ipi | gpt-4o-mini | PL/EN vs PL/PL | 386 | 34 / 26 | +2.1% [-2.8%, +7.2%] | 0.366 | 0.733 |
+| ipi | qwen3-8b | EN/EN vs EN/PL | 330 | 9 / 4 | +1.5% [-0.9%, +3.9%] | 0.267 | 1 |
+| ipi | qwen3-8b | EN/EN vs PL/EN | 239 | 2 / 4 | -0.8% [-2.9%, +1.2%] | 0.688 | 1 |
 | ipi | qwen3-8b | EN/EN vs PL/PL (primary) | 240 | 3 / 2 | +0.4% [-0.8%, +1.7%] | n/a | - |
-| ipi | qwen3-8b | EN/PL vs PL/EN | 239 | 4 / 7 | -1.3% [-4.2%, +1.7%] | 0.549 | 1 |
+| ipi | qwen3-8b | EN/PL vs PL/EN | 239 | 4 / 7 | -1.3% [-4.2%, +2.1%] | 0.549 | 1 |
 | ipi | qwen3-8b | EN/PL vs PL/PL | 240 | 4 / 4 | +0.0% [-2.5%, +2.9%] | 1 | 1 |
 | ipi | qwen3-8b | PL/EN vs PL/PL | 264 | 4 / 1 | +1.1% [-0.4%, +2.7%] | n/a | n/a |
