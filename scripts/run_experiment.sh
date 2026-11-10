@@ -14,7 +14,8 @@
 #
 # Logs go to runs/full/<model>-<task_lang>; finished runs are skipped (no -f), so an interrupted call can simply be
 # repeated. A run cut off in the middle (e.g. the process was killed) leaves a log without `security`; such logs are
-# moved to runs/full/_cutoff/ (kept for the record) and the run is made again when its part is next run.
+# moved to runs/full/_cutoff/ (kept for the record) and the run is made again when its part is next run; logs
+# changed in the last 15 minutes are left alone (they can belong to a parallel call on the same directory).
 # The harness must be committed: the logs record the commit and export_results.py rejects dirty runs.
 # vLLM models read VLLM_BASE_URL / VLLM_API_KEY from .env; the matching server must be running (notes/runpod.md).
 # SUITE=workspace_pl runs the fully Polish workspace (workspace_pl/README.md) instead; its logs go to
@@ -102,6 +103,9 @@ mkdir -p "$base"
 log="$base/$model-$task_lang-$payload.log"
 stamp=$(date '+%Y%m%d-%H%M%S')
 for file in $(grep -L '"security"' "$base/$model-$task_lang"/*/"$suite"/*/*/*.json 2>/dev/null || true); do
+    # a running run of another process in the same directory also has no `security` yet, but its log is
+    # rewritten after every model call; only logs untouched for 15 minutes are cut-off runs
+    [ -n "$(find "$file" -mmin -15)" ] && continue
     target="$base/_cutoff/$stamp/${file#$base/}"
     mkdir -p "$(dirname "$target")"
     mv "$file" "$target"
