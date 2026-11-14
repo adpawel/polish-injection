@@ -108,7 +108,7 @@ for file in $(grep -L '"security"' "$base/$model-$task_lang"/*/"$suite"/*/*/*.js
     [ -n "$(find "$file" -mmin -15)" ] && continue
     target="$base/_cutoff/$stamp/${file#$base/}"
     mkdir -p "$(dirname "$target")"
-    mv "$file" "$target"
+    mv "$file" "$target" 2>/dev/null || continue  # another call may have moved it first
     echo "$(date '+%F %T') cut-off run moved to $target" >> "$log"
 done
 
