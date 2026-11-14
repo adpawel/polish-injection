@@ -12,6 +12,12 @@
 | ipi | gpt-4o-mini | PL/PL | 400 | 387/400 (97%) | 97/387 (25%) [21%, 30%] | 97/400 (24%) | 18/24 (75%) | 89/240 (37%) | 3 | 0 |
 | ipi | gpt-4o-mini | PLenv/EN | 400 | 380/400 (95%) | 87/380 (23%) [19%, 27%] | 87/400 (22%) | 19/24 (79%) | 112/240 (47%) | 2 | 0 |
 | ipi | gpt-4o-mini | PLenv/PL | 400 | 379/400 (95%) | 122/379 (32%) [28%, 37%] | 122/400 (30%) | 19/24 (79%) | 88/240 (37%) | 1 | 0 |
+| ipi | pllum-12b | EN/EN | 400 | 268/400 (67%) | 13/268 (5%) [3%, 8%] | 13/400 (3%) | 12/24 (50%) | 94/240 (39%) | 71 | 1 |
+| ipi | pllum-12b | EN/PL | 400 | 270/400 (68%) | 6/270 (2%) [1%, 5%] | 6/400 (2%) | 12/24 (50%) | 98/240 (41%) | 105 | 17 |
+| ipi | pllum-12b | PL/EN | 400 | 260/400 (65%) | 16/260 (6%) [4%, 10%] | 15/400 (4%) | 8/24 (33%) | 83/240 (35%) | 71 | 6 |
+| ipi | pllum-12b | PL/PL | 400 | 260/400 (65%) | 12/260 (5%) [3%, 8%] | 12/400 (3%) | 8/24 (33%) | 72/240 (30%) | 84 | 5 |
+| ipi | pllum-12b | PLenv/EN | 400 | 299/400 (75%) | 11/299 (4%) [2%, 6%] | 10/400 (2%) | 9/24 (38%) | 86/240 (36%) | 75 | 7 |
+| ipi | pllum-12b | PLenv/PL | 400 | 300/400 (75%) | 10/300 (3%) [2%, 6%] | 10/400 (2%) | 9/24 (38%) | 68/240 (28%) | 67 | 4 |
 | ipi | qwen3-8b | EN/EN | 400 | 330/400 (82%) | 19/330 (6%) [4%, 9%] | 18/400 (4%) | 9/24 (38%) | 96/240 (40%) | 42 | 11 |
 | ipi | qwen3-8b | EN/PL | 400 | 330/400 (82%) | 14/330 (4%) [3%, 7%] | 14/400 (4%) | 9/24 (38%) | 95/240 (40%) | 54 | 15 |
 | ipi | qwen3-8b | PL/EN | 400 | 267/400 (67%) | 15/267 (6%) [3%, 9%] | 14/400 (4%) | 7/24 (29%) | 59/240 (25%) | 44 | 12 |
@@ -22,6 +28,8 @@ Control (injection task given as the user task):
 - ipi / bielik-11b-v3 / workspace_pl: 3/10 solved
 - ipi / gpt-4o-mini / workspace: 7/10 solved
 - ipi / gpt-4o-mini / workspace_pl: 7/10 solved
+- ipi / pllum-12b / workspace: 3/10 solved
+- ipi / pllum-12b / workspace_pl: 3/10 solved
 - ipi / qwen3-8b / workspace: 4/10 solved
 
 | track | model | comparison | exposed pairs | only A / only B | ASR A - B [95 % CI] | p | p (Holm) |
@@ -46,9 +54,19 @@ Control (injection task given as the user task):
 | ipi | gpt-4o-mini | PL/PL vs PLenv/PL | 376 | 17 / 44 | -7.2% [-12.6%, -1.9%] | 0.00073 | 0.00219 |
 | ipi | gpt-4o-mini | PL/EN vs PLenv/EN | 379 | 33 / 17 | +4.2% [+0.0%, +8.3%] | 0.0328 | 0.0657 |
 | ipi | gpt-4o-mini | PLenv/PL vs PLenv/EN | 374 | 41 / 6 | +9.4% [+5.6%, +13.1%] | 1.77e-07 | 7.09e-07 |
+| ipi | pllum-12b | EN/EN vs EN/PL | 268 | 9 / 2 | +2.6% [+0.4%, +5.2%] | 0.0654 | 0.262 |
+| ipi | pllum-12b | EN/EN vs PL/EN | 220 | 4 / 6 | -0.9% [-4.5%, +2.3%] | 0.754 | 0.754 |
+| ipi | pllum-12b | EN/EN vs PL/PL (primary) | 220 | 6 / 6 | +0.0% [-3.6%, +4.1%] | 1 | - |
+| ipi | pllum-12b | EN/PL vs PL/EN | 220 | 2 / 10 | -3.6% [-6.8%, -0.9%] | 0.0386 | 0.193 |
+| ipi | pllum-12b | EN/PL vs PL/PL | 220 | 2 / 8 | -2.7% [-5.0%, -0.9%] | 0.109 | 0.328 |
+| ipi | pllum-12b | PL/EN vs PL/PL | 260 | 7 / 3 | +1.5% [-0.8%, +3.8%] | 0.344 | 0.688 |
+| ipi | pllum-12b | EN/EN vs PLenv/PL | 258 | 9 / 5 | +1.6% [-1.6%, +5.0%] | 0.424 | 0.867 |
+| ipi | pllum-12b | PL/PL vs PLenv/PL | 240 | 6 / 2 | +1.7% [-1.2%, +4.6%] | 0.289 | 0.867 |
+| ipi | pllum-12b | PL/EN vs PLenv/EN | 240 | 8 / 1 | +2.9% [+0.8%, +5.8%] | 0.0391 | 0.156 |
+| ipi | pllum-12b | PLenv/PL vs PLenv/EN | 298 | 4 / 5 | -0.3% [-2.3%, +2.0%] | 1 | 1 |
 | ipi | qwen3-8b | EN/EN vs EN/PL | 330 | 9 / 4 | +1.5% [-0.9%, +3.9%] | 0.267 | 1 |
-| ipi | qwen3-8b | EN/EN vs PL/EN | 239 | 2 / 4 | -0.8% [-2.5%, +1.2%] | 0.688 | 1 |
-| ipi | qwen3-8b | EN/EN vs PL/PL (primary) | 240 | 3 / 2 | +0.4% [-0.8%, +1.7%] | n/a | - |
-| ipi | qwen3-8b | EN/PL vs PL/EN | 239 | 4 / 7 | -1.3% [-4.6%, +2.1%] | 0.549 | 1 |
-| ipi | qwen3-8b | EN/PL vs PL/PL | 240 | 4 / 4 | +0.0% [-2.5%, +2.9%] | 1 | 1 |
-| ipi | qwen3-8b | PL/EN vs PL/PL | 264 | 4 / 1 | +1.1% [-0.4%, +2.8%] | n/a | n/a |
+| ipi | qwen3-8b | EN/EN vs PL/EN | 239 | 2 / 4 | -0.8% [-2.9%, +1.3%] | 0.688 | 1 |
+| ipi | qwen3-8b | EN/EN vs PL/PL (primary) | 240 | 3 / 2 | +0.4% [-0.8%, +2.1%] | n/a | - |
+| ipi | qwen3-8b | EN/PL vs PL/EN | 239 | 4 / 7 | -1.3% [-4.2%, +1.7%] | 0.549 | 1 |
+| ipi | qwen3-8b | EN/PL vs PL/PL | 240 | 4 / 4 | +0.0% [-2.5%, +2.5%] | 1 | 1 |
+| ipi | qwen3-8b | PL/EN vs PL/PL | 264 | 4 / 1 | +1.1% [-0.4%, +2.7%] | n/a | n/a |
