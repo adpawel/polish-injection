@@ -12,6 +12,12 @@
 | ipi | gpt-4o-mini | PL/PL | 400 | 387/400 (97%) | 97/387 (25%) [21%, 30%] | 97/400 (24%) | 18/24 (75%) | 89/240 (37%) | 3 | 0 |
 | ipi | gpt-4o-mini | PLenv/EN | 400 | 380/400 (95%) | 87/380 (23%) [19%, 27%] | 87/400 (22%) | 19/24 (79%) | 112/240 (47%) | 2 | 0 |
 | ipi | gpt-4o-mini | PLenv/PL | 400 | 379/400 (95%) | 122/379 (32%) [28%, 37%] | 122/400 (30%) | 19/24 (79%) | 88/240 (37%) | 1 | 0 |
+| ipi | mistral-nemo | EN/EN | 400 | 317/400 (79%) | 38/317 (12%) [9%, 16%] | 26/400 (6%) | 4/24 (17%) | 42/240 (18%) | 180 | 3 |
+| ipi | mistral-nemo | EN/PL | 400 | 312/400 (78%) | 15/312 (5%) [3%, 8%] | 12/400 (3%) | 4/24 (17%) | 70/240 (29%) | 168 | 0 |
+| ipi | mistral-nemo | PL/EN | 400 | 300/400 (75%) | 44/300 (15%) [11%, 19%] | 33/400 (8%) | 6/24 (25%) | 31/240 (13%) | 195 | 2 |
+| ipi | mistral-nemo | PL/PL | 400 | 300/400 (75%) | 33/300 (11%) [8%, 15%] | 27/400 (7%) | 6/24 (25%) | 25/240 (10%) | 191 | 2 |
+| ipi | mistral-nemo | PLenv/EN | 400 | 290/400 (72%) | 38/290 (13%) [10%, 17%] | 25/400 (6%) | 3/24 (12%) | 14/240 (6%) | 242 | 6 |
+| ipi | mistral-nemo | PLenv/PL | 400 | 297/400 (74%) | 41/297 (14%) [10%, 18%] | 29/400 (7%) | 3/24 (12%) | 12/240 (5%) | 236 | 14 |
 | ipi | pllum-12b | EN/EN | 400 | 268/400 (67%) | 13/268 (5%) [3%, 8%] | 13/400 (3%) | 12/24 (50%) | 94/240 (39%) | 71 | 1 |
 | ipi | pllum-12b | EN/PL | 400 | 270/400 (68%) | 6/270 (2%) [1%, 5%] | 6/400 (2%) | 12/24 (50%) | 98/240 (41%) | 105 | 17 |
 | ipi | pllum-12b | PL/EN | 400 | 260/400 (65%) | 16/260 (6%) [4%, 10%] | 15/400 (4%) | 8/24 (33%) | 83/240 (35%) | 71 | 6 |
@@ -28,6 +34,8 @@ Control (injection task given as the user task):
 - ipi / bielik-11b-v3 / workspace_pl: 3/10 solved
 - ipi / gpt-4o-mini / workspace: 7/10 solved
 - ipi / gpt-4o-mini / workspace_pl: 7/10 solved
+- ipi / mistral-nemo / workspace: 3/10 solved
+- ipi / mistral-nemo / workspace_pl: 1/10 solved
 - ipi / pllum-12b / workspace: 3/10 solved
 - ipi / pllum-12b / workspace_pl: 3/10 solved
 - ipi / qwen3-8b / workspace: 4/10 solved
@@ -54,19 +62,29 @@ Control (injection task given as the user task):
 | ipi | gpt-4o-mini | PL/PL vs PLenv/PL | 376 | 17 / 44 | -7.2% [-12.6%, -1.9%] | 0.00073 | 0.00219 |
 | ipi | gpt-4o-mini | PL/EN vs PLenv/EN | 379 | 33 / 17 | +4.2% [+0.0%, +8.3%] | 0.0328 | 0.0657 |
 | ipi | gpt-4o-mini | PLenv/PL vs PLenv/EN | 374 | 41 / 6 | +9.4% [+5.6%, +13.1%] | 1.77e-07 | 7.09e-07 |
-| ipi | pllum-12b | EN/EN vs EN/PL | 268 | 9 / 2 | +2.6% [+0.4%, +5.2%] | 0.0654 | 0.262 |
-| ipi | pllum-12b | EN/EN vs PL/EN | 220 | 4 / 6 | -0.9% [-4.5%, +2.3%] | 0.754 | 0.754 |
+| ipi | mistral-nemo | EN/EN vs EN/PL | 311 | 21 / 0 | +6.8% [+4.1%, +9.9%] | 9.54e-07 | 3.81e-06 |
+| ipi | mistral-nemo | EN/EN vs PL/EN | 297 | 4 / 13 | -3.0% [-6.1%, +0.3%] | 0.049 | 0.0981 |
+| ipi | mistral-nemo | EN/EN vs PL/PL (primary) | 297 | 14 / 12 | +0.7% [-3.3%, +4.5%] | 0.845 | - |
+| ipi | mistral-nemo | EN/PL vs PL/EN | 292 | 1 / 29 | -9.6% [-12.7%, -6.3%] | 5.77e-08 | 2.89e-07 |
+| ipi | mistral-nemo | EN/PL vs PL/PL | 292 | 1 / 19 | -6.2% [-9.1%, -3.4%] | 4.01e-05 | 0.00012 |
+| ipi | mistral-nemo | PL/EN vs PL/PL | 300 | 20 / 9 | +3.7% [-0.3%, +7.7%] | 0.0614 | 0.0981 |
+| ipi | mistral-nemo | EN/EN vs PLenv/PL | 284 | 11 / 17 | -2.1% [-6.3%, +2.4%] | 0.345 | 1 |
+| ipi | mistral-nemo | PL/PL vs PLenv/PL | 287 | 8 / 17 | -3.1% [-6.2%, +0.3%] | 0.108 | 0.431 |
+| ipi | mistral-nemo | PL/EN vs PLenv/EN | 280 | 16 / 13 | +1.1% [-3.6%, +5.4%] | 0.711 | 1 |
+| ipi | mistral-nemo | PLenv/PL vs PLenv/EN | 290 | 13 / 10 | +1.0% [-2.8%, +4.8%] | 0.678 | 1 |
+| ipi | pllum-12b | EN/EN vs EN/PL | 268 | 9 / 2 | +2.6% [+0.4%, +5.6%] | 0.0654 | 0.262 |
+| ipi | pllum-12b | EN/EN vs PL/EN | 220 | 4 / 6 | -0.9% [-4.1%, +2.3%] | 0.754 | 0.754 |
 | ipi | pllum-12b | EN/EN vs PL/PL (primary) | 220 | 6 / 6 | +0.0% [-3.6%, +4.1%] | 1 | - |
 | ipi | pllum-12b | EN/PL vs PL/EN | 220 | 2 / 10 | -3.6% [-6.8%, -0.9%] | 0.0386 | 0.193 |
-| ipi | pllum-12b | EN/PL vs PL/PL | 220 | 2 / 8 | -2.7% [-5.0%, -0.9%] | 0.109 | 0.328 |
-| ipi | pllum-12b | PL/EN vs PL/PL | 260 | 7 / 3 | +1.5% [-0.8%, +3.8%] | 0.344 | 0.688 |
-| ipi | pllum-12b | EN/EN vs PLenv/PL | 258 | 9 / 5 | +1.6% [-1.6%, +5.0%] | 0.424 | 0.867 |
+| ipi | pllum-12b | EN/PL vs PL/PL | 220 | 2 / 8 | -2.7% [-5.5%, -0.9%] | 0.109 | 0.328 |
+| ipi | pllum-12b | PL/EN vs PL/PL | 260 | 7 / 3 | +1.5% [-0.4%, +3.8%] | 0.344 | 0.688 |
+| ipi | pllum-12b | EN/EN vs PLenv/PL | 258 | 9 / 5 | +1.6% [-1.9%, +5.0%] | 0.424 | 0.867 |
 | ipi | pllum-12b | PL/PL vs PLenv/PL | 240 | 6 / 2 | +1.7% [-1.2%, +4.6%] | 0.289 | 0.867 |
-| ipi | pllum-12b | PL/EN vs PLenv/EN | 240 | 8 / 1 | +2.9% [+0.8%, +5.8%] | 0.0391 | 0.156 |
-| ipi | pllum-12b | PLenv/PL vs PLenv/EN | 298 | 4 / 5 | -0.3% [-2.3%, +2.0%] | 1 | 1 |
+| ipi | pllum-12b | PL/EN vs PLenv/EN | 240 | 8 / 1 | +2.9% [+0.8%, +5.4%] | 0.0391 | 0.156 |
+| ipi | pllum-12b | PLenv/PL vs PLenv/EN | 298 | 4 / 5 | -0.3% [-2.7%, +2.0%] | 1 | 1 |
 | ipi | qwen3-8b | EN/EN vs EN/PL | 330 | 9 / 4 | +1.5% [-0.9%, +3.9%] | 0.267 | 1 |
-| ipi | qwen3-8b | EN/EN vs PL/EN | 239 | 2 / 4 | -0.8% [-2.9%, +1.3%] | 0.688 | 1 |
+| ipi | qwen3-8b | EN/EN vs PL/EN | 239 | 2 / 4 | -0.8% [-2.9%, +1.2%] | 0.688 | 1 |
 | ipi | qwen3-8b | EN/EN vs PL/PL (primary) | 240 | 3 / 2 | +0.4% [-0.8%, +2.1%] | n/a | - |
-| ipi | qwen3-8b | EN/PL vs PL/EN | 239 | 4 / 7 | -1.3% [-4.2%, +1.7%] | 0.549 | 1 |
-| ipi | qwen3-8b | EN/PL vs PL/PL | 240 | 4 / 4 | +0.0% [-2.5%, +2.5%] | 1 | 1 |
-| ipi | qwen3-8b | PL/EN vs PL/PL | 264 | 4 / 1 | +1.1% [-0.4%, +2.7%] | n/a | n/a |
+| ipi | qwen3-8b | EN/PL vs PL/EN | 239 | 4 / 7 | -1.3% [-4.2%, +2.1%] | 0.549 | 1 |
+| ipi | qwen3-8b | EN/PL vs PL/PL | 240 | 4 / 4 | +0.0% [-2.5%, +2.9%] | 1 | 1 |
+| ipi | qwen3-8b | PL/EN vs PL/PL | 264 | 4 / 1 | +1.1% [-0.4%, +2.8%] | n/a | n/a |
