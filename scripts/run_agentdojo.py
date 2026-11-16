@@ -52,7 +52,8 @@
    ends the run without output. With `max_tokens` 4096 (protocol) this should be rare.
 13. Fully Polish workspace (workspace_pl/): with `-s workspace_pl` the suite of workspace_pl/suite.py is registered.
    It brings its own translations (used instead of data/<lang>/) and its Polish system prompt, which replaces
-   AgentDojo's default one when no `--system-message` is given. Without `-s workspace_pl` nothing changes.
+   AgentDojo's default one when no `--system-message` is given; it must be the only suite of the call (the prompt
+   is replaced for the whole process). Without `-s workspace_pl` nothing changes.
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -452,11 +453,16 @@ class ImportantInstructionsAttackPL(ImportantInstructionsAttack):
         }
 
 
-def _uses_suite(name: str) -> bool:
-    return any(a in ("-s", "--suite") and b == name for a, b in zip(sys.argv, sys.argv[1:]))
+def _suites() -> list[str]:
+    """Suites named on the command line: `-s X`, `--suite X` or `--suite=X`."""
+    names = [b for a, b in zip(sys.argv, sys.argv[1:]) if a in ("-s", "--suite")]
+    return names + [a.split("=", 1)[1] for a in sys.argv if a.startswith("--suite=")]
 
 
-if _uses_suite("workspace_pl"):
+if "workspace_pl" in _suites():
+    if set(_suites()) != {"workspace_pl"}:
+        # the Polish system prompt below replaces the default one for the whole process
+        raise SystemExit("workspace_pl must be run alone (without other -s suites)")
     sys.path.insert(0, str(DATA_DIR.parent))
     from workspace_pl.suite import SYSTEM_PROMPT_PL
 

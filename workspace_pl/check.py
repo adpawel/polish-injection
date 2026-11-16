@@ -92,16 +92,16 @@ def check_payloads(errors: list) -> None:
 
 
 def check_attacker_variants(errors: list) -> None:
-    from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
+    from agentdojo.functions_runtime import FunctionsRuntime
 
     suite = workspace_pl_suite
     environment = suite.load_and_inject_default_environment({})
     runtime = FunctionsRuntime(suite.tools)
     for task_id, variants in INJECTION_TASK_VARIANTS.items():
+        if task_id == "injection_task_13":
+            continue  # its ground truth is empty in AgentDojo; checked by the English ground truth above
         task = suite.injection_tasks[task_id]
         for variant in variants:
-            if task_id == "injection_task_13":
-                continue  # its ground truth is empty in AgentDojo; checked by the English ground truth above
             post = environment.model_copy(deep=True)
             original = {name: getattr(task, name) for name in variant}
             for name, value in variant.items():
