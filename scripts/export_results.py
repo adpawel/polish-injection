@@ -11,6 +11,8 @@ One row per log file under each log directory:
 
 The suite workspace_pl takes the utility risk of the English workspace tasks, so utility is reported on the same
 task subset in every condition.
+Its utility is re-scored from the replay of the logged tool calls with the current checkers (changed after the
+runs, protocol "Changes" 2026-11-17); the logged value is kept only for runs cut off by a context overflow.
 
 Only logs written with fix 11 of run_agentdojo.py (run metadata) are accepted, and only from a clean harness
 (`harness_dirty: false`) unless --allow-dirty is given. Every row is validated against the schema; any invalid row
@@ -27,10 +29,11 @@ from pathlib import Path
 
 import jsonschema
 
-from attack_summary import summarise_run, text
+from attack_summary import replay_utility, summarise_run, text
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = json.loads((ROOT / "schemas" / "run_result.schema.json").read_text(encoding="utf-8"))
+RESCORED_UTILITY = {"workspace_pl"}  # suites whose utility comes from attack_summary.replay_utility
 UTILITY_RISK = json.loads((ROOT / "data" / "utility_risk.json").read_text(encoding="utf-8"))
 # suite -> the key of its tasks in data/utility_risk.json
 RISK_SUITE = {"workspace": "workspace", "workspace_pl": "workspace"}
@@ -124,6 +127,9 @@ def export_row(path: Path, allow_dirty: bool) -> dict | None:
             context_overflow=run["context_overflow"],
             utility=run["utility"],
         )
+    if log["suite_name"] in RESCORED_UTILITY and kind != "injection_as_user_task" and not row["context_overflow"]:
+        # a run cut off by a context overflow keeps AgentDojo's utility (False), as in the other suites
+        row["utility"] = replay_utility(log)
     return row
 
 

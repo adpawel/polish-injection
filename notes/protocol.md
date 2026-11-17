@@ -282,5 +282,8 @@ section lists only what must hold so that its results can be compared with the I
   not affected). user_task_15: the event location must now be "dom babci" as a whole (the English checker
   compares for equality; the Polish one accepted any location containing it). user_task_11: also accepts
   "1 hour 30 minutes" (as the English checker) and "1 godz. 30 min" (task excluded from reported utility, risk
-  "medium"). To do before the PLenv results are final: re-score utility of the saved `workspace_pl` logs by
-  replaying their tool calls (`attack_summary.replay_utility`) and re-export.
+  "medium"). Re-scoring all 3,360 saved `workspace_pl` logs by replaying their tool calls
+  (`attack_summary.replay_utility`, now used by `export_results.py` for this suite) changed no run: no model
+  produced a location or time form on which the old and new checkers differ. The replay agrees with the logged
+  utility everywhere (also on 840 English GPT-4o-mini logs as a fidelity check) except 3 Mistral-Nemo runs cut
+  off by a context overflow, which keep AgentDojo's value (False). Results in `results/` are therefore unchanged.
