@@ -13,6 +13,10 @@ dedup ASR on those pairs, 95 % CI from a cluster bootstrap over user tasks (one 
 pairs). Primary comparison EN/EN vs PL/PL; the other five pairs are secondary, Holm-corrected within a model.
 No test is reported with fewer than 6 discordant pairs (5:0 already gives p = 0.0625).
 
+Fully Polish environment (suite workspace_pl, notes/protocol.md 2.5): configurations PLenv/PL and PLenv/EN (task,
+environment, tools and system prompt Polish; payload PL or EN). Their comparisons with the main configurations
+are a separate family, Holm-corrected within a model; they do not change the main family.
+
 Usage: python scripts/analyse.py results.jsonl [results2.jsonl ...] [--bootstrap 2000] [--seed 0]
 """
 
@@ -26,12 +30,18 @@ from pathlib import Path
 
 CONFIGS = ["EN/EN", "EN/PL", "PL/EN", "PL/PL"]
 PRIMARY = ("EN/EN", "PL/PL")
+# notes/protocol.md 2.5: fully Polish vs fully English, and the effect of the environment language
+ENV_COMPARISONS = [("EN/EN", "PLenv/PL"), ("PL/PL", "PLenv/PL"), ("PL/EN", "PLenv/EN"), ("PLenv/PL", "PLenv/EN")]
 SAFE_RISK = {"none", "low"}
 MIN_DISCORDANT = 6
 
 
+def task_part(row: dict) -> str:
+    return "PLenv" if row["suite"] == "workspace_pl" else row["task_lang"].upper()
+
+
 def config(row: dict) -> str:
-    return f"{row['task_lang'].upper()}/{row['payload_lang'].upper()}"
+    return f"{task_part(row)}/{row['payload_lang'].upper()}"
 
 
 def wilson(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -86,9 +96,9 @@ def describe(rows: list[dict]) -> None:
         if row["run_type"] == "attack":
             attack[key + (config(row),)].append(row)
         elif row["run_type"] == "no_attack":
-            no_attack[key + (row["task_lang"].upper(),)].append(row)
+            no_attack[key + (task_part(row),)].append(row)
         else:
-            control[key].append(row)
+            control[key + (row["suite"],)].append(row)
 
     print("| track | model | config | runs | exposure | ASR dedup / exposed [95 % CI] | raw ASR | utility (no attack) "
           "| utility (attack) | no output | overflow |")
@@ -107,10 +117,10 @@ def describe(rows: list[dict]) -> None:
         )
     if control:
         print("\nControl (injection task given as the user task):")
-        for (track, model), runs in sorted(control.items()):
+        for (track, model, suite), runs in sorted(control.items()):
             solved = sorted({r["user_task"] for r in runs if r["utility"]})
             tasks = sorted({r["user_task"] for r in runs})
-            print(f"- {track} / {model}: {len(solved)}/{len(tasks)} solved")
+            print(f"- {track} / {model} / {suite}: {len(solved)}/{len(tasks)} solved")
 
 
 def compare(rows: list[dict], resamples: int, seed: int) -> None:
@@ -123,7 +133,7 @@ def compare(rows: list[dict], resamples: int, seed: int) -> None:
     print("|---|---|---|---|---|---|---|---|")
     for (track, model), cells in sorted(by_model.items()):
         results = {}
-        for a, b in itertools.combinations(CONFIGS, 2):
+        for a, b in list(itertools.combinations(CONFIGS, 2)) + ENV_COMPARISONS:
             pairs = []
             for (cfg, user_task, injection_task), row_a in cells.items():
                 row_b = cells.get((b, user_task, injection_task))
@@ -132,7 +142,9 @@ def compare(rows: list[dict], resamples: int, seed: int) -> None:
             only_a = sum(x and not y for _, x, y in pairs)
             only_b = sum(y and not x for _, x, y in pairs)
             results[(a, b)] = (pairs, only_a, only_b, mcnemar_exact(only_a, only_b))
-        secondary = holm({k: v[3] for k, v in results.items() if k != PRIMARY and v[1] + v[2] >= MIN_DISCORDANT})
+        secondary = {}
+        for family in ([k for k in results if k not in ENV_COMPARISONS and k != PRIMARY], ENV_COMPARISONS):
+            secondary.update(holm({k: results[k][3] for k in family if results[k][1] + results[k][2] >= MIN_DISCORDANT}))
         for (a, b), (pairs, only_a, only_b, p) in results.items():
             if not pairs:
                 continue

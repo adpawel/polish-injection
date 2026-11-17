@@ -14,9 +14,12 @@
 #
 # Logs go to runs/full/<model>-<task_lang>; finished runs are skipped (no -f), so an interrupted call can simply be
 # repeated. A run cut off in the middle (e.g. the process was killed) leaves a log without `security`; such logs are
-# moved to runs/full/_cutoff/ (kept for the record) and the run is made again when its part is next run.
+# moved to runs/full/_cutoff/ (kept for the record) and the run is made again when its part is next run; logs
+# changed in the last 15 minutes are left alone (they can belong to a parallel call on the same directory).
 # The harness must be committed: the logs record the commit and export_results.py rejects dirty runs.
 # vLLM models read VLLM_BASE_URL / VLLM_API_KEY from .env; the matching server must be running (notes/runpod.md).
+# SUITE=workspace_pl runs the fully Polish workspace (workspace_pl/README.md) instead; its logs go to
+# runs/workspace_pl/<model>-pl (task_lang must be pl).
 # Run from the repository root in Git Bash.
 set -euo pipefail
 
@@ -25,7 +28,7 @@ INJECTION_TASKS=(0 1 2 3 4 5 6 10 11 13)
 PY=.venv/Scripts/python.exe
 
 if [ $# -lt 3 ]; then
-    sed -n '2,19p' "$0"
+    sed -n '2,21p' "$0"
     exit 2
 fi
 model=$1 task_lang=$2 payload=$3
@@ -47,19 +50,33 @@ set -a
 . ./.env
 set +a
 export AGENTDOJO_MAX_TOKENS=4096 AGENTDOJO_TASK_LANG=$task_lang PYTHONIOENCODING=utf-8
-args=(-s workspace --logdir "runs/full/$model-$task_lang")
+suite=${SUITE:-workspace}
+case $suite in
+    workspace) base=runs/full ;;
+    workspace_pl)
+        base=runs/workspace_pl
+        # the user tasks are adapted to the Polish data; the English ones would search for English texts
+        [ "$task_lang" = pl ] || { echo "SUITE=workspace_pl needs task_lang pl" >&2; exit 2; } ;;
+    *) echo "unknown SUITE: $suite" >&2; exit 2 ;;
+esac
+args=(-s "$suite" --logdir "$base/$model-$task_lang")
 
 case $model in
     gpt-4o-mini)
         args+=(--model GPT_4O_MINI_2024_07_18) ;;
     qwen3-8b)
         export AGENTDOJO_SYSTEM_ROLE=1
-        system="$($PY -c 'from agentdojo.agent_pipeline.agent_pipeline import load_system_message; print(load_system_message(None)+" /no_think", end="")')"
+        if [ "$suite" = workspace_pl ]; then
+            system="$($PY -c 'from workspace_pl.suite import SYSTEM_PROMPT_PL; print(SYSTEM_PROMPT_PL+" /no_think", end="")')"
+        else
+            system="$($PY -c 'from agentdojo.agent_pipeline.agent_pipeline import load_system_message; print(load_system_message(None)+" /no_think", end="")')"
+        fi
         args+=(--model OPENAI_COMPATIBLE --model-id "Qwen/Qwen3-8B:nscale" --system-message "$system") ;;
     pllum-12b|mistral-nemo|bielik-11b-v3)
         export OPENAI_COMPATIBLE_BASE_URL="$VLLM_BASE_URL" OPENAI_COMPATIBLE_API_KEY="$VLLM_API_KEY"
         [ "$model" != bielik-11b-v3 ] && export AGENTDOJO_PROMPTING=1
-        served=$($PY -c "import json,sys,urllib.request as u; r=u.Request(sys.argv[1]+'/models', headers={'Authorization': 'Bearer '+sys.argv[2]}); print(json.load(u.urlopen(r, timeout=30))['data'][0]['id'])" "$VLLM_BASE_URL" "$VLLM_API_KEY")
+        # the RunPod proxy rejects urllib's default User-Agent (403)
+        served=$($PY -c "import json,sys,urllib.request as u; r=u.Request(sys.argv[1]+'/models', headers={'Authorization': 'Bearer '+sys.argv[2], 'User-Agent': 'agentdojo-runner'}); print(json.load(u.urlopen(r, timeout=30))['data'][0]['id'])" "$VLLM_BASE_URL" "$VLLM_API_KEY")
         if [ "$served" != "$model" ]; then
             echo "the pod serves '$served', not '$model'" >&2
             exit 1
@@ -82,13 +99,16 @@ if [ "$payload" != none ]; then
     done
 fi
 
-mkdir -p runs/full
-log="runs/full/$model-$task_lang-$payload.log"
+mkdir -p "$base"
+log="$base/$model-$task_lang-$payload.log"
 stamp=$(date '+%Y%m%d-%H%M%S')
-for file in $(grep -L '"security"' runs/full/"$model-$task_lang"/*/workspace/*/*/*.json 2>/dev/null || true); do
-    target="runs/full/_cutoff/$stamp/${file#runs/full/}"
+for file in $(grep -L '"security"' "$base/$model-$task_lang"/*/"$suite"/*/*/*.json 2>/dev/null || true); do
+    # a running run of another process in the same directory also has no `security` yet, but its log is
+    # rewritten after every model call; only logs untouched for 15 minutes are cut-off runs
+    [ -n "$(find "$file" -mmin -15)" ] && continue
+    target="$base/_cutoff/$stamp/${file#$base/}"
     mkdir -p "$(dirname "$target")"
-    mv "$file" "$target"
+    mv "$file" "$target" 2>/dev/null || continue  # another call may have moved it first
     echo "$(date '+%F %T') cut-off run moved to $target" >> "$log"
 done
 

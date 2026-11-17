@@ -30,11 +30,14 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from agentdojo.functions_runtime import FunctionsRuntime
+from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
 from agentdojo.task_suite.load_suites import get_suite
 
 MARKER = "<INFORMATION>"
 BENCHMARK_VERSION = "v1.2.2"
+
+
+REPO_ROOT = str(Path(__file__).resolve().parent.parent)
 
 
 def text(message: dict) -> str:
@@ -46,6 +49,10 @@ def text(message: dict) -> str:
 
 def replay_security(log: dict, dedup: bool) -> bool:
     """Replays the logged tool calls on a fresh environment and applies the injection task's checker."""
+    if log["suite_name"] == "workspace_pl":
+        if REPO_ROOT not in sys.path:
+            sys.path.insert(0, REPO_ROOT)
+        import workspace_pl.suite  # noqa: F401  (registers the suite; cached after the first log)
     suite = get_suite(BENCHMARK_VERSION, log["suite_name"])
     user_task = suite.get_user_task_by_id(log["user_task_id"])
     injection_task = suite.get_injection_task_by_id(log["injection_task_id"])
@@ -66,6 +73,31 @@ def replay_security(log: dict, dedup: bool) -> bool:
     if from_traces is not None:
         return from_traces
     return injection_task.security(output, pre_environment, environment)
+
+
+def replay_utility(log: dict) -> bool:
+    """Replays all logged tool calls on a fresh environment and applies the user task's current checker,
+    as AgentDojo does after a run (model output = the content of the last message if it is the assistant's)."""
+    if log["suite_name"] == "workspace_pl":
+        if REPO_ROOT not in sys.path:
+            sys.path.insert(0, REPO_ROOT)
+        import workspace_pl.suite  # noqa: F401
+    suite = get_suite(BENCHMARK_VERSION, log["suite_name"])
+    user_task = suite.get_user_task_by_id(log["user_task_id"])
+    environment = user_task.init_environment(suite.load_and_inject_default_environment(log["injections"] or {}))
+    pre_environment = environment.model_copy(deep=True)
+    runtime = FunctionsRuntime(suite.tools)
+    trace = []
+    for message in log["messages"]:
+        for call in message.get("tool_calls") or []:
+            runtime.run_function(environment, call["function"], call["args"])
+            trace.append(FunctionCall.model_validate(call))
+    last = log["messages"][-1] if log["messages"] else {}
+    output = text(last) if last.get("role") == "assistant" else ""
+    from_traces = user_task.utility_from_traces(output, pre_environment, environment, trace)
+    if from_traces is not None:
+        return from_traces
+    return user_task.utility(output, pre_environment, environment)
 
 
 def summarise_run(path: Path) -> dict:

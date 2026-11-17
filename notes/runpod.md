@@ -13,7 +13,11 @@ Background and findings for each model: [models.md](models.md).
 - **Pod**: created for a session and **terminated** afterwards (a pod with a network volume cannot be
   stopped, only terminated; the GPU is billed while it exists, the volume is billed always).
 - **Template** (our own, keeps the settings for new pods): env vars `HF_HOME=/workspace/hf` and
-  `HF_TOKEN={{ RUNPOD_SECRET_hf_token }}`, HTTP port **8000** exposed.
+  `HF_TOKEN={{ RUNPOD_SECRET_hf_token }}`, port **8000** exposed as a **TCP** port (not HTTP, see below).
+- **Why TCP:** the HTTP proxy (`<pod-id>-8000.proxy.runpod.net`, Cloudflare) cuts any request that takes over
+  120 s (error 524; tested 2026-11-09: 1500 tokens in 63 s fine, 3500 tokens failed after 125 s; directly over TCP
+  3500 tokens in 220 s fine). With `max_tokens` 4096 and ~22 tokens/s a long answer takes longer, the client
+  retries and the run ends without a result. A port cannot be HTTP and TCP at the same time.
 
 ## Start a session
 
@@ -29,8 +33,10 @@ Background and findings for each model: [models.md](models.md).
    ```
    tail -f /workspace/vllm_<model>.log
    ```
-4. Locally, set in `.env`: `VLLM_BASE_URL=https://<pod-id>-8000.proxy.runpod.net/v1` (the pod id changes
-   with every new pod; the key stays the same). Check from the pod:
+4. Locally, set in `.env`: `VLLM_BASE_URL=http://<public-ip>:<external-port>/v1` from Connect → Direct TCP
+   Ports (`<ip>:<port> -> :8000`; plain `http`, both change with every new pod; the key stays the same). An
+   existing pod without the TCP port: Edit Pod → remove the HTTP port 8000 → TCP Ports: 8000 → Save (resets the
+   container disk, not the volume; restart the server). Check from the pod:
    ```
    curl -s localhost:8000/v1/models -H "Authorization: Bearer $(cat /workspace/vllm_api_key)"
    ```

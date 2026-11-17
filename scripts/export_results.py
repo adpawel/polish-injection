@@ -6,7 +6,13 @@ One row per log file under each log directory:
 - `<user_task>/none/none.json` -> "no_attack" (utility baseline);
 - `<injection_task>/none/none.json` -> "injection_as_user_task" (control: the attacker's goal as the user task).
   AgentDojo gives the model the English goal here in every configuration, so a control run in a Polish-task
-  log directory repeats the English one; only controls from English-task directories are exported.
+  log directory repeats the English one; only controls from English-task directories are exported. Exception:
+  the fully Polish workspace (suite workspace_pl, Polish tasks only), whose controls differ by the environment.
+
+The suite workspace_pl takes the utility risk of the English workspace tasks, so utility is reported on the same
+task subset in every condition.
+Its utility is re-scored from the replay of the logged tool calls with the current checkers (changed after the
+runs, protocol "Changes" 2026-11-17); the logged value is kept only for runs cut off by a context overflow.
 
 Only logs written with fix 11 of run_agentdojo.py (run metadata) are accepted, and only from a clean harness
 (`harness_dirty: false`) unless --allow-dirty is given. Every row is validated against the schema; any invalid row
@@ -23,11 +29,14 @@ from pathlib import Path
 
 import jsonschema
 
-from attack_summary import summarise_run, text
+from attack_summary import replay_utility, summarise_run, text
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = json.loads((ROOT / "schemas" / "run_result.schema.json").read_text(encoding="utf-8"))
+RESCORED_UTILITY = {"workspace_pl"}  # suites whose utility comes from attack_summary.replay_utility
 UTILITY_RISK = json.loads((ROOT / "data" / "utility_risk.json").read_text(encoding="utf-8"))
+# suite -> the key of its tasks in data/utility_risk.json
+RISK_SUITE = {"workspace": "workspace", "workspace_pl": "workspace"}
 PAYLOAD_LANG = {"important_instructions_no_model_name": "en", "important_instructions_pl": "pl"}
 SERVER = {
     "gpt-4o-mini": "OpenAI API",
@@ -58,7 +67,7 @@ def export_row(path: Path, allow_dirty: bool) -> dict | None:
     if "security" not in log and "context_length_exceeded" not in (log.get("error") or ""):
         raise ValueError(f"{path}: no `security` - the run crashed; rerun it with -f")
     kind = run_type(path)
-    if kind == "injection_as_user_task" and log["task_lang"] != "en":
+    if kind == "injection_as_user_task" and log["task_lang"] != "en" and log["suite_name"] != "workspace_pl":
         return None
     messages = log["messages"]
     last = messages[-1] if messages else {}
@@ -103,7 +112,7 @@ def export_row(path: Path, allow_dirty: bool) -> dict | None:
         },
     }
     if kind != "injection_as_user_task":
-        row["utility_risk"] = UTILITY_RISK[log["suite_name"]][log["user_task_id"]][0]
+        row["utility_risk"] = UTILITY_RISK[RISK_SUITE[log["suite_name"]]][log["user_task_id"]][0]
     if kind == "attack":
         if log["attack_type"] not in PAYLOAD_LANG:
             raise ValueError(f"{path}: unknown attack {log['attack_type']}")
@@ -118,6 +127,9 @@ def export_row(path: Path, allow_dirty: bool) -> dict | None:
             context_overflow=run["context_overflow"],
             utility=run["utility"],
         )
+    if log["suite_name"] in RESCORED_UTILITY and kind != "injection_as_user_task" and not row["context_overflow"]:
+        # a run cut off by a context overflow keeps AgentDojo's utility (False), as in the other suites
+        row["utility"] = replay_utility(log)
     return row
 
 

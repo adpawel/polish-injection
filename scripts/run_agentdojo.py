@@ -50,6 +50,10 @@
    the body of an exfiltration e-mail) crashed the whole benchmark in AgentDojo's `json.loads`. Such calls are
    dropped and logged ("dropped tool call with unparsable arguments"); a message left without calls and text
    ends the run without output. With `max_tokens` 4096 (protocol) this should be rare.
+13. Fully Polish workspace (workspace_pl/): with `-s workspace_pl` the suite of workspace_pl/suite.py is registered.
+   It brings its own translations (used instead of data/<lang>/) and its Polish system prompt, which replaces
+   AgentDojo's default one when no `--system-message` is given; it must be the only suite of the call (the prompt
+   is replaced for the whole process). Without `-s workspace_pl` nothing changes.
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -398,6 +402,10 @@ def load_translations(lang: str, name: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
+def suite_translations(suite, lang: str) -> dict:
+    return getattr(suite, "translations", {}).get(lang) or load_translations(lang, suite.name)
+
+
 def translated(entry: dict, lang: str, key: str, en_text: str) -> str:
     if entry["en"] != en_text:
         raise ValueError(f"{key}: the English source in data/{lang}/ differs from AgentDojo's text")
@@ -413,7 +421,7 @@ def _untranslated_prompt(task_id: str, lang: str) -> property:
 
 def translate_user_tasks(lang: str) -> None:
     for suite_name, suite in get_suites(BENCHMARK_VERSION).items():
-        translations = load_translations(lang, suite_name).get("user_tasks", {})
+        translations = suite_translations(suite, lang).get("user_tasks", {})
         for task_id, task in suite.user_tasks.items():
             if task_id in translations:
                 type(task).PROMPT = translated(translations[task_id], lang, task_id, task.PROMPT)
@@ -433,7 +441,7 @@ class ImportantInstructionsAttackPL(ImportantInstructionsAttack):
         template = load_translations(self.lang, "attacks")["important_instructions"]
         self.jailbreak = translated(template, self.lang, "important_instructions", ImportantInstructionsAttack._JB_STRING)
         self.model_name = template["model_name"][self.lang]
-        self.goals = load_translations(self.lang, task_suite.name).get("injection_tasks", {})
+        self.goals = suite_translations(task_suite, self.lang).get("injection_tasks", {})
 
     def attack(self, user_task, injection_task) -> dict[str, str]:
         if injection_task.ID not in self.goals:
@@ -444,6 +452,21 @@ class ImportantInstructionsAttackPL(ImportantInstructionsAttack):
             for inj in self.get_injection_candidates(user_task)
         }
 
+
+def _suites() -> list[str]:
+    """Suites named on the command line: `-s X`, `--suite X` or `--suite=X`."""
+    names = [b for a, b in zip(sys.argv, sys.argv[1:]) if a in ("-s", "--suite")]
+    return names + [a.split("=", 1)[1] for a in sys.argv if a.startswith("--suite=")]
+
+
+if "workspace_pl" in _suites():
+    if set(_suites()) != {"workspace_pl"}:
+        # the Polish system prompt below replaces the default one for the whole process
+        raise SystemExit("workspace_pl must be run alone (without other -s suites)")
+    sys.path.insert(0, str(DATA_DIR.parent))
+    from workspace_pl.suite import SYSTEM_PROMPT_PL
+
+    agent_pipeline.load_system_message = lambda system_message_name: SYSTEM_PROMPT_PL
 
 if os.environ.get("AGENTDOJO_TASK_LANG", "en") != "en":
     if "--benchmark-version" in sys.argv and sys.argv[sys.argv.index("--benchmark-version") + 1] != BENCHMARK_VERSION:
