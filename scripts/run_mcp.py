@@ -33,6 +33,7 @@ from openai import BadRequestError  # noqa: E402
 from mcp_track import attacks, world  # noqa: E402
 from mcp_track.replay import run_calls  # noqa: E402
 from mcp_track.runtime import McpFunctionsRuntime, McpHub  # noqa: E402
+from mcp_track.servers import bizutils  # noqa: E402
 from mcp_track.tasks import GOALS, SYSTEM_MESSAGE, USER_TASKS  # noqa: E402
 
 SUITE = "mcp_shop"
@@ -50,8 +51,9 @@ def final_answer(messages) -> str:
 
 
 def exposed(vector: str, messages) -> bool:
-    if vector == "mcp_result":
-        return any(m["role"] == "tool" and attacks.MARKER in get_text_content_as_str(m["content"] or []) for m in messages)
+    if vector == "mcp_result":  # every result of the third-party server carries the payload
+        return any(m["role"] == "tool" and not m["error"] and m["tool_call"].function in bizutils.DESCRIPTIONS
+                   for m in messages)
     # a poisoned description is part of every request; exposed once the model has been called
     return any(m["role"] == "assistant" for m in messages)
 
@@ -131,8 +133,8 @@ def main() -> None:
     name = pipeline.name.replace("/", "_")
 
     if args.control:
-        # as in AgentDojo's controls, the goal is given in English; Polish-task directories repeat it
-        jobs = [(g, GOALS[g].goal, None, "none", None) for g in (args.goals or GOALS)]
+        # the control prompt is English in every configuration (as AgentDojo's controls)
+        jobs = [(g, GOALS[g].control_prompt, None, "none", None) for g in (args.goals or GOALS)]
     else:
         tasks = args.user_tasks or list(USER_TASKS)
         prompts = {t: attacks.translated("user_tasks", t, USER_TASKS[t].prompt, args.task_lang, args.allow_draft) for t in tasks}
@@ -141,7 +143,7 @@ def main() -> None:
         else:
             attack = f"mcp_{args.vector}_{args.payload}"
             jobs = [(t, prompts[t], g, attack, attacks.payload(g, args.payload, args.allow_draft))
-                    for t in tasks for g in (args.goals or GOALS)]
+                    for t in tasks for g in (args.goals or GOALS) if GOALS[g].applies(t)]
 
     with OutputLogger(str(args.logdir), live=None):
         for task_id, prompt, goal_id, attack_type, text in jobs:

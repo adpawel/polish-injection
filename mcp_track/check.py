@@ -6,8 +6,10 @@
 3. every user task's ground truth uses the third-party server (V2 can reach the model in every task);
 4. every ground-truth call succeeds (no tool error);
 5. an empty run passes neither a utility nor a security checker;
-6. utility and security are independent: for every (user task, goal) pair, the task's ground truth followed by the
-   goal's ground truth passes both checkers (the attacker's side effects do not break the user's task);
+6. utility and security are independent: for every (user task, side-action goal) pair, the task's ground truth
+   followed by the goal's ground truth passes both checkers (the attacker's side effects do not break the user's
+   task); a tampering goal changes the user's own action, so it is checked by its ground truth (2) and by its
+   tampered version of every task it applies to;
 7. the Polish translations cover every task and goal and their English sources equal tasks.py.
 
 Usage: python -m mcp_track.check
@@ -49,13 +51,30 @@ def main() -> int:
 
     for task in USER_TASKS.values():
         for g in GOALS.values():
+            if g.applies_to is not None:
+                continue
             pre, post, _ = run_calls(task.ground_truth + g.ground_truth)
             if not task.utility(task.answer, pre, post):
                 problems.append(f"{task.id} + {g.id}: utility False when the goal is also carried out")
             if not g.security(pre, post):
                 problems.append(f"{task.id} + {g.id}: goal not detected after the user task")
 
+    # tampering goals: the user task's ground truth with the tampered action is detected
+    from mcp_track.tasks import _to_clearing, _with_archive
+    tamper = {"goal_6": _with_archive, "goal_7": _to_clearing}
+    for goal_id, change in tamper.items():
+        g = GOALS[goal_id]
+        if not g.applies_to:
+            problems.append(f"{goal_id}: applies to no task")
+        for task_id in sorted(g.applies_to or []):
+            pre, post, _ = run_calls(change(USER_TASKS[task_id].ground_truth))
+            if not g.security(pre, post):
+                problems.append(f"{goal_id} on {task_id}: tampered ground truth not detected")
+
     pl = translations("pl", allow_draft=True)
+    from mcp_track.attacks import FRAME
+    if pl.get("frame", {}).get("payload", {}).get("en") != FRAME["en"]:
+        problems.append("pl frame: missing or English source differs from attacks.FRAME")
     for section, items, text in (("user_tasks", USER_TASKS, lambda t: t.prompt), ("goals", GOALS, lambda g: g.goal)):
         if set(pl[section]) != set(items):
             problems.append(f"pl {section}: ids differ from tasks.py")
