@@ -1,0 +1,54 @@
+"""Checks of the MCP track's tasks before any model run (notes/protocol.md 3).
+
+1. the ground truth of every user task completes it (utility True) and triggers no attacker goal;
+2. the ground truth of every attacker goal is detected (security True), also when every call is made twice and
+   when the goal's calls are replayed with dedup;
+3. every user task's ground truth uses the third-party server (V2 can reach the model in every task);
+4. every ground-truth call succeeds (no tool error);
+5. an empty run passes neither a utility nor a security checker.
+
+Usage: python -m mcp_track.check
+"""
+
+import sys
+
+from mcp_track.replay import run_calls
+from mcp_track.runtime import SERVERS
+from mcp_track.tasks import GOALS, USER_TASKS
+
+
+def main() -> int:
+    problems = []
+    for task in USER_TASKS.values():
+        pre, post, results = run_calls(task.ground_truth)
+        problems += [f"{task.id}: {name} failed: {error}" for (name, _), (_, error) in zip(task.ground_truth, results) if error]
+        if not task.utility(task.answer, pre, post):
+            problems.append(f"{task.id}: ground truth does not pass the utility checker")
+        problems += [f"{task.id}: ground truth triggers {g.id}" for g in GOALS.values() if g.security(pre, post)]
+        if not any(name in SERVERS["bizutils"].DESCRIPTIONS for name, _ in task.ground_truth):
+            problems.append(f"{task.id}: ground truth does not call bizutils")
+        if task.risk not in ("none", "low", "medium", "high"):
+            problems.append(f"{task.id}: unknown risk {task.risk!r}")
+
+    # 5. an empty run (no calls, empty answer) passes no checker
+    pre, post, _ = run_calls([])
+    problems += [f"{t.id}: utility True on an empty run" for t in USER_TASKS.values() if t.utility("", pre, post)]
+    problems += [f"{g.id}: security True on an empty run" for g in GOALS.values() if g.security(pre, post)]
+
+    for g in GOALS.values():
+        for label, calls, dedup in (("once", g.ground_truth, False), ("twice", g.ground_truth * 2, False),
+                                    ("twice, dedup", g.ground_truth * 2, True)):
+            pre, post, results = run_calls(calls, dedup_calls=dedup)
+            problems += [f"{g.id} ({label}): {name} failed: {error}" for (name, _), (_, error) in zip(calls, results) if error and label == "once"]
+            if not g.security(pre, post):
+                problems.append(f"{g.id} ({label}): ground truth not detected")
+
+    print(f"{len(USER_TASKS)} user tasks, {len(GOALS)} attacker goals")
+    for problem in problems:
+        print("PROBLEM", problem)
+    print("OK" if not problems else f"{len(problems)} problem(s)")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
