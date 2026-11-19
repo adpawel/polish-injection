@@ -5,7 +5,9 @@
    when the goal's calls are replayed with dedup;
 3. every user task's ground truth uses the third-party server (V2 can reach the model in every task);
 4. every ground-truth call succeeds (no tool error);
-5. an empty run passes neither a utility nor a security checker.
+5. an empty run passes neither a utility nor a security checker;
+6. utility and security are independent: for every (user task, goal) pair, the task's ground truth followed by the
+   goal's ground truth passes both checkers (the attacker's side effects do not break the user's task).
 
 Usage: python -m mcp_track.check
 """
@@ -42,6 +44,14 @@ def main() -> int:
             problems += [f"{g.id} ({label}): {name} failed: {error}" for (name, _), (_, error) in zip(calls, results) if error and label == "once"]
             if not g.security(pre, post):
                 problems.append(f"{g.id} ({label}): ground truth not detected")
+
+    for task in USER_TASKS.values():
+        for g in GOALS.values():
+            pre, post, _ = run_calls(task.ground_truth + g.ground_truth)
+            if not task.utility(task.answer, pre, post):
+                problems.append(f"{task.id} + {g.id}: utility False when the goal is also carried out")
+            if not g.security(pre, post):
+                problems.append(f"{task.id} + {g.id}: goal not detected after the user task")
 
     print(f"{len(USER_TASKS)} user tasks, {len(GOALS)} attacker goals")
     for problem in problems:
