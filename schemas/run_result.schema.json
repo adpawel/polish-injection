@@ -33,7 +33,11 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.0.0"
+      "description": "1.1.0 added `vector` (MCP track); rows of 1.0.0 stay valid.",
+      "enum": [
+        "1.0.0",
+        "1.1.0"
+      ]
     },
     "track": {
       "description": "ipi = indirect prompt injection through tool results (AgentDojo); mcp = tool poisoning through tool descriptions.",
@@ -97,6 +101,16 @@
       "type": [
         "string",
         "null"
+      ]
+    },
+    "vector": {
+      "description": "Attack vector (notes/protocol.md 3.4): ipi_data = payload in data returned by a tool (IPI track); tp_third_party / tp_trusted = poisoned tool description of a third-party / trusted MCP server; mcp_result = payload in a result of a third-party MCP tool. Required for MCP attack runs; null when there is no payload.",
+      "enum": [
+        "ipi_data",
+        "tp_third_party",
+        "mcp_result",
+        "tp_trusted",
+        null
       ]
     },
     "exposed": {
@@ -309,6 +323,32 @@
           },
           "attack_success_dedup": {
             "const": null
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "track": {
+            "const": "mcp"
+          },
+          "run_type": {
+            "const": "attack"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "vector"
+        ],
+        "properties": {
+          "vector": {
+            "enum": [
+              "tp_third_party",
+              "mcp_result",
+              "tp_trusted"
+            ]
           }
         }
       }
