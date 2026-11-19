@@ -4,3 +4,6 @@ agentdojo @ git+https://github.com/ethz-spylab/agentdojo.git@089ed468cf3ed0322ac
 
 # Validation of exported results against schemas/run_result.schema.json
 jsonschema==4.26.0
+
+# MCP track (mcp_track/): official MCP Python SDK (FastMCP servers, in-memory client sessions)
+mcp==1.12.4
