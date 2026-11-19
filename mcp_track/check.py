@@ -7,13 +7,15 @@
 4. every ground-truth call succeeds (no tool error);
 5. an empty run passes neither a utility nor a security checker;
 6. utility and security are independent: for every (user task, goal) pair, the task's ground truth followed by the
-   goal's ground truth passes both checkers (the attacker's side effects do not break the user's task).
+   goal's ground truth passes both checkers (the attacker's side effects do not break the user's task);
+7. the Polish translations cover every task and goal and their English sources equal tasks.py.
 
 Usage: python -m mcp_track.check
 """
 
 import sys
 
+from mcp_track.attacks import translations
 from mcp_track.replay import run_calls
 from mcp_track.runtime import SERVERS
 from mcp_track.tasks import GOALS, USER_TASKS
@@ -52,6 +54,15 @@ def main() -> int:
                 problems.append(f"{task.id} + {g.id}: utility False when the goal is also carried out")
             if not g.security(pre, post):
                 problems.append(f"{task.id} + {g.id}: goal not detected after the user task")
+
+    pl = translations("pl", allow_draft=True)
+    for section, items, text in (("user_tasks", USER_TASKS, lambda t: t.prompt), ("goals", GOALS, lambda g: g.goal)):
+        if set(pl[section]) != set(items):
+            problems.append(f"pl {section}: ids differ from tasks.py")
+        problems += [f"pl {section}/{i}: English source differs" for i, item in items.items()
+                     if i in pl[section] and pl[section][i]["en"] != text(item)]
+    if "DRAFT" in pl["_meta"]["status"]:
+        print("note: the Polish translations are a draft (not reviewed)")
 
     print(f"{len(USER_TASKS)} user tasks, {len(GOALS)} attacker goals")
     for problem in problems:

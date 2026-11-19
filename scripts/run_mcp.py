@@ -119,10 +119,11 @@ def main() -> None:
     parser.add_argument("--system-suffix", default="", help="appended to the system message (Qwen: ' /no_think')")
     parser.add_argument("--logdir", required=True, type=Path)
     parser.add_argument("-f", "--force", action="store_true")
+    parser.add_argument("--allow-draft", action="store_true", help="use unreviewed translations (tests only)")
     args = parser.parse_args()
 
-    if args.task_lang != "en" or args.env_lang != "en":
-        raise SystemExit("Polish tasks / environment: translations not added yet (mcp_track/data/pl/)")
+    if args.env_lang != "en":
+        raise SystemExit("Polish environment (PLenv): seed and descriptions not translated yet")
     harness.RUN_METADATA["task_lang"] = args.task_lang
     pipeline = AgentPipeline.from_config(PipelineConfig(
         llm=ModelsEnum[args.model].value, model_id=args.model_id, defense=None, system_message_name=None,
@@ -130,14 +131,16 @@ def main() -> None:
     name = pipeline.name.replace("/", "_")
 
     if args.control:
+        # as in AgentDojo's controls, the goal is given in English; Polish-task directories repeat it
         jobs = [(g, GOALS[g].goal, None, "none", None) for g in (args.goals or GOALS)]
     else:
         tasks = args.user_tasks or list(USER_TASKS)
+        prompts = {t: attacks.translated("user_tasks", t, USER_TASKS[t].prompt, args.task_lang, args.allow_draft) for t in tasks}
         if args.payload == "none":
-            jobs = [(t, USER_TASKS[t].prompt, None, "none", None) for t in tasks]
+            jobs = [(t, prompts[t], None, "none", None) for t in tasks]
         else:
             attack = f"mcp_{args.vector}_{args.payload}"
-            jobs = [(t, USER_TASKS[t].prompt, g, attack, attacks.payload(g, args.payload))
+            jobs = [(t, prompts[t], g, attack, attacks.payload(g, args.payload, args.allow_draft))
                     for t in tasks for g in (args.goals or GOALS)]
 
     with OutputLogger(str(args.logdir), live=None):
