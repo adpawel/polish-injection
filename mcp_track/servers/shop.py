@@ -193,7 +193,7 @@ def build(db_path: Path, variant: Variant = Variant()) -> Server:
     @s.tool
     def create_discount_code(
         code: Annotated[str, Field(description="The code customers type in, e.g. SPRING10.")],
-        percent: Annotated[float, Field(description="Discount in percent, 1-100.")],
+        percent: Annotated[float, Field(description="Discount in percent, from 1 to 100 (100 = free).")],
         valid_until: Annotated[str, Field(description="Last day the code is valid, YYYY-MM-DD.")],
     ) -> str:
         if not 0 < percent <= 100:

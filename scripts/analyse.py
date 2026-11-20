@@ -20,7 +20,8 @@ are a separate family, Holm-corrected within a model; they do not change the mai
 MCP track (notes/protocol.md 3): every table row and comparison is per vector (track shown as mcp/<vector>); the
 baseline without attack and the control are per track. Vector comparisons (3.5, H5): a pair is the same (user
 task, goal, configuration) under two vectors, used when exposed under both; McNemar and cluster bootstrap as
-above, Holm over the three vector pairs within (model, configuration).
+above, Holm over the three vector pairs within (model, configuration). Exploratory: ASR per goal and per goal
+kind (side action / tampering), per vector.
 
 Usage: python scripts/analyse.py results.jsonl [results2.jsonl ...] [--bootstrap 2000] [--seed 0]
 """
@@ -29,6 +30,7 @@ import argparse
 import itertools
 import json
 import random
+import sys
 from collections import defaultdict
 from math import comb, sqrt
 from pathlib import Path
@@ -208,6 +210,32 @@ def compare_vectors(rows: list[dict], resamples: int, seed: int) -> None:
                   f"{f'{adjusted[(a, b)]:.3g}' if tested else 'n/a'} |")
 
 
+def by_goal(rows: list[dict]) -> None:
+    """MCP, exploratory (3.5): dedup ASR on exposed runs per goal and per goal kind (side action / tampering)."""
+    mcp = [r for r in rows if r["track"] == "mcp" and r["run_type"] == "attack"]
+    if not mcp:
+        return
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from mcp_track.tasks import GOALS
+
+    cells = defaultdict(lambda: defaultdict(list))  # (model, config) -> (goal or kind, vector) -> exposed rows
+    for row in mcp:
+        if row["exposed"]:
+            goal = GOALS[row["injection_task"]]
+            for key in (goal.id, goal.kind):
+                cells[(row["model"], config(row))][(key, row["vector"])].append(row)
+    vectors = [v for v in VECTORS if any(r["vector"] == v for r in mcp)]
+    for (model, cfg), cell in sorted(cells.items()):
+        print(f"\nMCP by goal, {model} {cfg} (dedup ASR on exposed runs; exploratory):\n")
+        print("| goal | kind | " + " | ".join(vectors) + " |")
+        print("|---|---|" + "---|" * len(vectors))
+        for key in [*GOALS, "side", "tampering"]:
+            kind = GOALS[key].kind if key in GOALS else "**all**"
+            label = key if key in GOALS else f"**{key}**"
+            values = [pct(sum(r["attack_success_dedup"] for r in cell[(key, v)]), len(cell[(key, v)])) for v in vectors]
+            print(f"| {label} | {kind} | " + " | ".join(values) + " |")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("results", nargs="+", type=Path)
@@ -218,6 +246,7 @@ def main() -> None:
     describe(rows)
     compare(rows, args.bootstrap, args.seed)
     compare_vectors(rows, args.bootstrap, args.seed)
+    by_goal(rows)
 
 
 if __name__ == "__main__":

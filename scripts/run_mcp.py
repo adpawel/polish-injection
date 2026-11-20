@@ -37,7 +37,7 @@ from mcp_track.servers import bizutils  # noqa: E402
 from mcp_track.tasks import GOALS, SYSTEM_MESSAGE, USER_TASKS  # noqa: E402
 
 SUITE = "mcp_shop"
-BENCHMARK_VERSION = "mcp_shop-v1"
+BENCHMARK_VERSION = "mcp_shop-v2"  # v2 (2026-11-20): goal_8..11, discount-percent description; v1 = pilots
 
 
 def tool_calls(messages) -> list[tuple[str, dict]]:

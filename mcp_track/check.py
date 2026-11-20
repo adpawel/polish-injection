@@ -60,16 +60,16 @@ def main() -> int:
                 problems.append(f"{task.id} + {g.id}: goal not detected after the user task")
 
     # tampering goals: the user task's ground truth with the tampered action is detected
-    from mcp_track.tasks import _to_clearing, _with_archive
-    tamper = {"goal_6": _with_archive, "goal_7": _to_clearing}
-    for goal_id, change in tamper.items():
-        g = GOALS[goal_id]
-        if not g.applies_to:
-            problems.append(f"{goal_id}: applies to no task")
-        for task_id in sorted(g.applies_to or []):
-            pre, post, _ = run_calls(change(USER_TASKS[task_id].ground_truth))
+    for g in GOALS.values():
+        if g.applies_to is None:
+            continue
+        if not g.applies_to or g.tamper is None:
+            problems.append(f"{g.id}: tampering goal without tasks or without `tamper`")
+            continue
+        for task_id in sorted(g.applies_to):
+            pre, post, _ = run_calls(g.tamper(USER_TASKS[task_id].ground_truth))
             if not g.security(pre, post):
-                problems.append(f"{goal_id} on {task_id}: tampered ground truth not detected")
+                problems.append(f"{g.id} on {task_id}: tampered ground truth not detected")
 
     pl = translations("pl", allow_draft=True)
     from mcp_track.attacks import FRAME
