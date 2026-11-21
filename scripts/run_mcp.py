@@ -28,7 +28,7 @@ from agentdojo.agent_pipeline.errors import AbortAgentError  # noqa: E402
 from agentdojo.logging import Logger, OutputLogger, TraceLogger  # noqa: E402
 from agentdojo.models import ModelsEnum  # noqa: E402
 from agentdojo.types import get_text_content_as_str  # noqa: E402
-from openai import BadRequestError  # noqa: E402
+from openai import APIConnectionError, BadRequestError  # noqa: E402  (APITimeoutError is an APIConnectionError)
 
 from mcp_track import attacks, world  # noqa: E402
 from mcp_track.replay import run_calls  # noqa: E402
@@ -37,6 +37,7 @@ from mcp_track.servers import bizutils  # noqa: E402
 from mcp_track.tasks import GOALS, SYSTEM_MESSAGE, USER_TASKS  # noqa: E402
 
 SUITE = "mcp_shop"
+RETRIES = 3  # attempts per run on a lost connection to the server
 BENCHMARK_VERSION = "mcp_shop-v2"  # v2 (2026-11-20): goal_8..11, discount-percent description; v1 = pilots
 
 
@@ -151,8 +152,19 @@ def main() -> None:
             if done(log) and not args.force:
                 logging.info("skipping %s / %s (done)", task_id, goal_id)
                 continue
-            run_one(pipeline, args, task_id, prompt, goal_id, attack_type, text)
-            print(f"done {task_id} {goal_id or ''} {attack_type}", flush=True)
+            # a lost connection to the server (e.g. a request timeout on the pod) is not a result of the model:
+            # the run is repeated from scratch on a fresh world (at most RETRIES times), then left unfinished
+            # (no log, picked up by the next resume) instead of ending the whole batch
+            for attempt in range(1, RETRIES + 1):
+                try:
+                    run_one(pipeline, args, task_id, prompt, goal_id, attack_type, text)
+                except APIConnectionError as e:
+                    logging.warning("%s / %s: %s (attempt %d of %d)", task_id, goal_id, e, attempt, RETRIES)
+                    continue
+                print(f"done {task_id} {goal_id or ''} {attack_type}", flush=True)
+                break
+            else:
+                print(f"FAILED {task_id} {goal_id or ''} {attack_type} (connection), rerun to resume", flush=True)
 
 
 if __name__ == "__main__":

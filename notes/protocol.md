@@ -410,3 +410,10 @@ exist); the other configurations after the review of the translations; the vLLM 
   descriptions, so only the **Polish tool descriptions of `workspace_pl` (PLenv/PL, PLenv/EN and the PLenv runs
   without attack of PLLuM-12B and Mistral-Nemo)** reached these two models as escapes. Those runs are kept and the
   limitation is reported; whether to repeat them is the user's decision.
+- 2026-11-21: **MCP runner: a lost connection repeats the run instead of ending the batch.** During the Bielik
+  runs three requests to the pod timed out (`APITimeoutError`, about 14:56) and each ended its whole
+  `run_mcp.py` process (no log for the interrupted run; the remaining runs were finished by resuming). Since then
+  `run_mcp.py` repeats a run whose request fails with `APIConnectionError` (timeout included) from scratch on a
+  fresh world, at most 3 times, and otherwise leaves it without a log (picked up by the next resume). Not a
+  change of the measurement: a run is logged only when it finished, as before; the model is not told about a
+  failed attempt.
