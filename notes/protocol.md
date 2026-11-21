@@ -208,7 +208,8 @@ ten there are ~10x more pairs per comparison.
 10. one attempt per run;
 11. run metadata and token usage in every log;
 12. tool calls with arguments cut off by `max_tokens` are dropped (logged) instead of crashing the benchmark;
-13. the fully Polish suite `workspace_pl` (2.5): registered with `-s workspace_pl`, Polish system prompt.
+13. the fully Polish suite `workspace_pl` (2.5): registered with `-s workspace_pl`, Polish system prompt;
+14. the tool list of prompt-based tool calling (6) dumped with `ensure_ascii=False` (since 2026-11-21, see Changes).
 
 ### 2.5 Additional condition: fully Polish environment (`workspace_pl/`)
 
@@ -349,6 +350,10 @@ three vectors; only its place differs:
    `runs/mcp/<vector|none|control>/<model>-<task_lang>`, resumable, refuses an uncommitted harness;
 2. export and analysis: `export_results.py` / `analyse.py` extended to the MCP logs (schema 1.1, field `vector`).
 
+Before the first run of a vLLM model: `scripts/check_mcp_delivery.py <model>` against its server (3.4: every
+vector's payload, EN and PL, is in the request and in the prompt rendered by the served chat template, and fits the
+context with the completion cap).
+
 Order: GPT-4o-mini EN/EN for all three vectors + baseline + control first (before the Polish translations
 exist); the other configurations after the review of the translations; the vLLM models after the check of 3.4.
 
@@ -396,3 +401,12 @@ exist); the other configurations after the review of the translations; the vLLM 
   `mcp_shop-v2`). The second pilot is kept: logs in `runs/mcp_pilot_usage_note/` (moved from `runs/mcp/`), rows in
   `results/mcp-pilot-usage-note.jsonl`. Per-goal and per-kind ASR is reported (exploratory, `analyse.py`); the
   headline ASR still pools all goals, so it depends on the mix of goals and is compared only within the track.
+- 2026-11-21: **harness fix 14 (prompt-based tool list) after the payload-delivery check of the MCP track.**
+  `scripts/check_mcp_delivery.py` found that `JsonToolCallPromptingLLM` (fix 6) wrote the tool list into the
+  system prompt with `json.dumps` defaults, so non-ASCII letters arrived as `\u` escapes: a Polish poisoned
+  description (MCP V1/V3, payload PL) would have reached PLLuM-12B and Mistral-Nemo escaped. Fixed before any MCP
+  run of these models. Effect on finished runs: GPT-4o-mini and Bielik use native tool calling (unaffected); in the
+  IPI track the payload is in tool results (fix 8, unaffected) and the main configurations have English tool
+  descriptions, so only the **Polish tool descriptions of `workspace_pl` (PLenv/PL, PLenv/EN and the PLenv runs
+  without attack of PLLuM-12B and Mistral-Nemo)** reached these two models as escapes. Those runs are kept and the
+  limitation is reported; whether to repeat them is the user's decision.

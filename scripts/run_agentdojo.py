@@ -54,6 +54,11 @@
    It brings its own translations (used instead of data/<lang>/) and its Polish system prompt, which replaces
    AgentDojo's default one when no `--system-message` is given; it must be the only suite of the call (the prompt
    is replaced for the whole process). Without `-s workspace_pl` nothing changes.
+14. Non-ASCII in the prompt-based tool list (fix 6): the tools were dumped into the system prompt with `json.dumps`,
+   which escapes every non-ASCII letter, so a Polish tool description reached PLLuM and Mistral-Nemo as `\\u`
+   escapes (found 2026-11-21 by scripts/check_mcp_delivery.py). Now dumped with `ensure_ascii=False`. Before the
+   fix it affected only the Polish tool descriptions of `workspace_pl` (PLenv runs of PLLuM and Mistral-Nemo); the
+   main IPI configurations have English tool descriptions and the payloads are in tool results (fix 8).
 
 Usage: same arguments as `python -m agentdojo.scripts.benchmark`, e.g.
     python scripts/run_agentdojo.py -s workspace -ut user_task_0 --model GPT_4O_MINI_2024_07_18
@@ -247,7 +252,8 @@ class JsonToolCallPromptingLLM(OpenAILLM):
             return system
         tools = "\n\n".join(
             json.dumps(
-                {"name": f.name, "description": f.description, "parameters": f.parameters.model_json_schema()}, indent=2
+                {"name": f.name, "description": f.description, "parameters": f.parameters.model_json_schema()},
+                indent=2, ensure_ascii=False,  # fix 14: Polish descriptions arrived as \u escapes
             )
             for f in runtime.functions.values()
         )

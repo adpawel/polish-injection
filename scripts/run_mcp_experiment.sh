@@ -3,7 +3,9 @@
 #
 #   scripts/run_mcp_experiment.sh <model> <task_lang> <payload_lang|none|control> [<vector>] [extra run_mcp.py args]
 #
-#   model:        gpt-4o-mini (others: added with their serving, as in run_experiment.sh)
+#   model:        gpt-4o-mini | bielik-11b-v3 | pllum-12b | mistral-nemo | qwen3-8b
+#                 (vLLM models: settings as in run_experiment.sh; the served model must match, and
+#                 scripts/check_mcp_delivery.py <model> must pass before its first run - notes/protocol.md 3.4)
 #   task_lang:    en | pl
 #   payload_lang: en | pl   -> attack runs (all user tasks x all goals) with <vector>
 #                 none      -> utility baseline without attack (clean servers)
@@ -41,6 +43,20 @@ export AGENTDOJO_MAX_TOKENS=4096 PYTHONIOENCODING=utf-8
 
 case $model in
     gpt-4o-mini) args=(--model GPT_4O_MINI_2024_07_18) ;;
+    pllum-12b|mistral-nemo|bielik-11b-v3|qwen3-8b)
+        export OPENAI_COMPATIBLE_BASE_URL="$VLLM_BASE_URL" OPENAI_COMPATIBLE_API_KEY="$VLLM_API_KEY"
+        args=(--model OPENAI_COMPATIBLE --model-id "$model")
+        case $model in
+            pllum-12b|mistral-nemo) export AGENTDOJO_PROMPTING=1 ;;  # prompt-based tool calling (fix 6)
+            # Qwen as in the IPI track (system role, reasoning off), but served by vLLM instead of nscale
+            qwen3-8b) export AGENTDOJO_SYSTEM_ROLE=1; args+=(--system-suffix " /no_think") ;;
+        esac
+        # the RunPod proxy rejects urllib's default User-Agent (403)
+        served=$($PY -c "import json,sys,urllib.request as u; r=u.Request(sys.argv[1]+'/models', headers={'Authorization': 'Bearer '+sys.argv[2], 'User-Agent': 'agentdojo-runner'}); print(json.load(u.urlopen(r, timeout=30))['data'][0]['id'])" "$VLLM_BASE_URL" "$VLLM_API_KEY")
+        if [ "$served" != "$model" ]; then
+            echo "the pod serves '$served', not '$model'" >&2
+            exit 1
+        fi ;;
     *) echo "unknown model: $model" >&2; exit 2 ;;
 esac
 
