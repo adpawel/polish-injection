@@ -417,3 +417,9 @@ exist); the other configurations after the review of the translations; the vLLM 
   fresh world, at most 3 times, and otherwise leaves it without a log (picked up by the next resume). Not a
   change of the measurement: a run is logged only when it finished, as before; the model is not told about a
   failed attempt.
+- 2026-11-22: **Qwen3-8B dropped from the study (decision of the user).** nscale, the serving of the IPI runs, no
+  longer serves the model, so the MCP runs and the PLenv runs of the IPI track would have needed another serving
+  (vLLM on the pod), a deviation from the fixed settings. Qwen3-8B is not run in the MCP track. Its finished IPI
+  runs (four main configurations and the runs without attack, `results/ipi.jsonl`) stay in the repository as they
+  are; whether they are reported (e.g. as a supplementary model without PLenv) or left out is decided when the
+  conclusions are written.
