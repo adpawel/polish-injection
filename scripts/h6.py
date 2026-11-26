@@ -15,7 +15,8 @@ often sits exactly on 0 - so such effects are marked (dagger in the table, hollo
 Models: those of both tracks except Qwen3-8B (dropped from the study, protocol "Changes" 2026-11-22).
 
 Usage: python scripts/h6.py [--ipi results/ipi.jsonl] [--mcp results/mcp.jsonl] [--out results] [--bootstrap 2000]
-Writes <out>/h6-analysis.md, <out>/h6-en-en-vs-pl-pl.png and <out>/h6-en-en-vs-en-pl.png.
+Writes <out>/h6-analysis.md and the charts <out>/h6-en-en-vs-pl-pl.png, <out>/h6-en-en-vs-en-pl.png, plus their Polish
+versions (for the slides) <out>/h6-en-en-vs-pl-pl-pl.png, <out>/h6-en-en-vs-en-pl-pl.png.
 """
 
 import argparse
@@ -36,6 +37,39 @@ TRACKS = [  # (key, short label, long label)
     ("mcp/tp_trusted", "MCP V3", "MCP V3: poisoned description, trusted server"),
 ]
 COMPARISONS = [("EN/EN", "PL/PL"), ("EN/EN", "EN/PL")]
+# chart texts per language ({a}, {b}: the two configurations; {n}: MIN_DISCORDANT)
+TEXT = {
+    "en": {
+        "tracks": {key: long for key, _, long in TRACKS},
+        "title": "Language effect: {a} − {b}  ({what})",
+        "what_both": "task and payload language",
+        "what_payload": "payload language alone, task English",
+        "subtitle": "Dedup ASR difference on pairs exposed in both, 95 % cluster-bootstrap CI over user tasks",
+        "hollow": "hollow, †: < {n} discordant pairs, CI unreliable",
+        "left": "← works better in {b}",
+        "right": "works better in {a} →",
+        "xlabel": "ASR {a} − ASR {b}  (percentage points)",
+        "decimal": ".",
+    },
+    "pl": {
+        "tracks": {
+            "ipi": "IPI: atak w wyniku narzędzia (AgentDojo)",
+            "mcp/tp_third_party": "MCP V1: zatruty opis narzędzia, obcy serwer",
+            "mcp/mcp_result": "MCP V2: atak w wyniku narzędzia",
+            "mcp/tp_trusted": "MCP V3: zatruty opis narzędzia, zaufany serwer",
+        },
+        "title": "Efekt języka: {a} − {b}  ({what})",
+        "what_both": "język polecenia i ataku",
+        "what_payload": "sam język ataku, polecenie po angielsku",
+        "subtitle": "Różnica odsetka udanych ataków na tych samych parach (zadanie, cel); 95% przedział ufności "
+                    "(bootstrap po zadaniach)",
+        "hollow": "puste kółko, †: za mało danych (< {n} par z różnym wynikiem), wynik niepewny",
+        "left": "← atak skuteczniejszy w {b}",
+        "right": "atak skuteczniejszy w {a} →",
+        "xlabel": "Skuteczność ataku {a} − {b}  (punkty procentowe)",
+        "decimal": ",",
+    },
+}
 # categorical slots 1-4 of the dataviz reference palette (light), validated: CVD-safe, two need text labels (done)
 COLORS = {"ipi": "#2a78d6", "mcp/tp_third_party": "#eb6834", "mcp/mcp_result": "#1baf7a", "mcp/tp_trusted": "#eda100"}
 INK, INK_2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
@@ -116,7 +150,12 @@ def write_table(results: dict, path: Path, sources: list[Path]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
-def plot(results: dict, a: str, b: str, path: Path, xlim: float) -> None:
+def plot(results: dict, a: str, b: str, path: Path, xlim: float, lang: str = "en") -> None:
+    t = TEXT[lang]
+
+    def num(x: float) -> str:
+        return pp(x).replace(".", t["decimal"])
+
     import matplotlib
 
     matplotlib.use("Agg")
@@ -151,7 +190,9 @@ def plot(results: dict, a: str, b: str, path: Path, xlim: float) -> None:
         else:
             ax.plot(r["diff"] * 100, yy, "o", ms=7, color=COLORS[key], mec=SURFACE, mew=1.5, zorder=3)
         ax.text(-xlim * 1.02, yy, short, ha="right", va="center", fontsize=9, color=INK)
-        ax.text(xlim * 1.03, yy, f"{pp(r['diff'])} [{pp(r['low'])}, {pp(r['high'])}]{' †' if few(r) else ''}   n={r['pairs']}",
+        ax.text(xlim * 1.03, yy, f"{num(r['diff'])} [{num(r['low'])}; {num(r['high'])}]{' †' if few(r) else ''}   n={r['pairs']}"
+                if lang == "pl" else
+                f"{num(r['diff'])} [{num(r['low'])}, {num(r['high'])}]{' †' if few(r) else ''}   n={r['pairs']}",
                 ha="left", va="center", fontsize=8, color=INK_2)
     for gy, model in group_y:
         ax.text(-xlim * 1.02, gy, model, ha="right", va="center", fontsize=9.5, fontweight="bold", color=INK)
@@ -167,22 +208,21 @@ def plot(results: dict, a: str, b: str, path: Path, xlim: float) -> None:
     ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:+.0f}".replace("-", "−")
                                                                  if v else "0"))
     # below the axis, in points: tick labels, then the direction hints, then the axis label
-    for x, ha, text in ((0.0, "left", f"← works better in {b}"), (1.0, "right", f"works better in {a} →")):
+    for x, ha, text in ((0.0, "left", t["left"].format(a=a, b=b)), (1.0, "right", t["right"].format(a=a, b=b))):
         ax.annotate(text, xy=(x, 0), xycoords="axes fraction", xytext=(0, -20), textcoords="offset points",
                     ha=ha, va="top", fontsize=8, color=INK_2)
-    ax.set_xlabel(f"ASR {a} − ASR {b}  (percentage points)", color=INK_2, fontsize=9, labelpad=22)
+    ax.set_xlabel(t["xlabel"].format(a=a, b=b), color=INK_2, fontsize=9, labelpad=22)
     # above the axis, in inches from the top: title, subtitle, legend
     top_in, bottom_in = 1.55, 0.95
     height += top_in + bottom_in - 2.05
     fig.set_size_inches(8.6, height)
-    what = "task and payload language" if b == "PL/PL" else "payload language alone, task English"
-    fig.text(0.02, 1 - 0.12 / height, f"Language effect: {a} − {b}  ({what})", ha="left", va="top",
+    what = t["what_both"] if b == "PL/PL" else t["what_payload"]
+    fig.text(0.02, 1 - 0.12 / height, t["title"].format(a=a, b=b, what=what), ha="left", va="top",
              fontsize=11.5, color=INK)
-    fig.text(0.02, 1 - 0.42 / height, "Dedup ASR difference on pairs exposed in both, 95 % cluster-bootstrap CI "
-             "over user tasks", ha="left", va="top", fontsize=8.5, color=INK_2)
-    handles = [Line2D([], [], color=COLORS[key], marker="o", lw=2, ms=6, label=long) for key, _, long in TRACKS]
+    fig.text(0.02, 1 - 0.42 / height, t["subtitle"], ha="left", va="top", fontsize=8.5, color=INK_2)
+    handles = [Line2D([], [], color=COLORS[key], marker="o", lw=2, ms=6, label=t["tracks"][key]) for key, _, _ in TRACKS]
     handles.append(Line2D([], [], color=INK_2, marker="o", mfc=SURFACE, lw=0, ms=6,
-                          label=f"hollow, †: < {MIN_DISCORDANT} discordant pairs, CI unreliable"))
+                          label=t["hollow"].format(n=MIN_DISCORDANT)))
     fig.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.015, 1 - 0.68 / height), ncol=2, frameon=False,
                fontsize=7.5, labelcolor=INK, handlelength=1.6, columnspacing=1.2, borderaxespad=0)
     fig.subplots_adjust(left=0.17, right=0.70, top=1 - top_in / height, bottom=bottom_in / height)
@@ -210,9 +250,11 @@ def main() -> None:
     bound = max(max(abs(r["low"]), abs(r["high"])) for r in results.values()) * 100
     xlim = max(5.0, (int(bound / 5) + 1) * 5)  # the same symmetric scale on both charts
     for a, b in COMPARISONS:
-        plot(results, a, b, args.out / f"h6-{a.replace('/', '-').lower()}-vs-{b.replace('/', '-').lower()}.png", xlim)
+        stem = f"h6-{a.replace('/', '-').lower()}-vs-{b.replace('/', '-').lower()}"
+        plot(results, a, b, args.out / f"{stem}.png", xlim, "en")
+        plot(results, a, b, args.out / f"{stem}-pl.png", xlim, "pl")  # Polish version for the slides
     missing = [(m, k) for m in MODELS for k, _, _ in TRACKS if (m, k, *COMPARISONS[0]) not in results]
-    print(f"wrote {args.out / 'h6-analysis.md'} and 2 charts; {len(results)} effects"
+    print(f"wrote {args.out / 'h6-analysis.md'} and 4 charts (2 English, 2 Polish); {len(results)} effects"
           + (f"; missing (model, track): {missing}" if missing else ""))
 
 
