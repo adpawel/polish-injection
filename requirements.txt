@@ -7,3 +7,5 @@ jsonschema==4.26.0
 
 # MCP track (mcp_track/): official MCP Python SDK (FastMCP servers, in-memory client sessions)
 mcp==1.12.4
+# mcp 1.12.4 imports pydantic internals removed in pydantic 2.12 (ImportError: eval_type_backport)
+pydantic==2.11.10

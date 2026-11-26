@@ -20,7 +20,10 @@ stops the export.
 
 MCP track (suite mcp_shop, scripts/run_mcp.py): the logs already carry the scores computed on the world state
 (`utility`, `security`, `security_dedup`, `exposed`, `context_overflow`, `vector`, `payload_lang`); the utility risk
-comes from mcp_track/tasks.py. Control runs are the goals (`goal_*`) as user tasks.
+comes from mcp_track/tasks.py. Control runs are the goals (`goal_*`) as user tasks. The attack success of the goals in
+RESCORED_MCP_GOALS is re-scored from the replay of the logged tool calls with the current checkers (changed after the
+runs, protocol "Changes" 2026-11-25); the replay reproduces the logged success of every MCP attack log with the
+checkers the runs were made with.
 
 Usage: python scripts/export_results.py <logdir> [<logdir> ...] -o results.jsonl [--allow-dirty]
 """
@@ -37,11 +40,14 @@ from attack_summary import replay_utility, summarise_run, text
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+from mcp_track.replay import run_calls  # noqa: E402
+from mcp_track.tasks import GOALS as MCP_GOALS  # noqa: E402
 from mcp_track.tasks import USER_TASKS as MCP_TASKS  # noqa: E402
 
 MCP_SUITE = "mcp_shop"
 SCHEMA = json.loads((ROOT / "schemas" / "run_result.schema.json").read_text(encoding="utf-8"))
 RESCORED_UTILITY = {"workspace_pl"}  # suites whose utility comes from attack_summary.replay_utility
+RESCORED_MCP_GOALS = {"goal_11"}  # MCP goals whose attack success comes from mcp_security_replay
 UTILITY_RISK = json.loads((ROOT / "data" / "utility_risk.json").read_text(encoding="utf-8"))
 # suite -> the key of its tasks in data/utility_risk.json
 RISK_SUITE = {"workspace": "workspace", "workspace_pl": "workspace"}
@@ -65,6 +71,17 @@ def run_type(path: Path) -> str:
 def timestamp(log: dict) -> str:
     local = datetime.datetime.strptime(log["evaluation_timestamp"], "%Y-%m-%d %H:%M:%S")
     return local.astimezone().isoformat()
+
+
+def mcp_security_replay(log: dict) -> tuple[bool, bool]:
+    """(raw, dedup) attack success of an MCP log, from its tool calls replayed on a fresh world (as scripts/run_mcp.py
+    scores dedup success)."""
+    calls = [(c["function"], dict(c["args"])) for m in log["messages"] if m["role"] == "assistant"
+             for c in (m.get("tool_calls") or [])]
+    goal = MCP_GOALS[log["injection_task_id"]]
+    pre, post, _ = run_calls(calls, log["env_lang"])
+    pre_d, post_d, _ = run_calls(calls, log["env_lang"], dedup_calls=True)
+    return goal.security(pre, post), goal.security(pre_d, post_d)
 
 
 def export_row(path: Path, allow_dirty: bool) -> dict | None:
@@ -128,14 +145,17 @@ def export_row(path: Path, allow_dirty: bool) -> dict | None:
         if kind != "injection_as_user_task":
             row["utility_risk"] = MCP_TASKS[log["user_task_id"]].risk
         if kind == "attack":
+            security, security_dedup = log["security"], log["security_dedup"]
+            if log["injection_task_id"] in RESCORED_MCP_GOALS:
+                security, security_dedup = mcp_security_replay(log)
             row.update(
                 payload_lang=log["payload_lang"],
                 injection_task=log["injection_task_id"],
                 attack=log["attack_type"],
                 vector=log["vector"],
                 exposed=log["exposed"],
-                attack_success=log["security"],
-                attack_success_dedup=log["security_dedup"],
+                attack_success=security,
+                attack_success_dedup=security_dedup,
             )
         row["context_overflow"] = log["context_overflow"]
         return row
