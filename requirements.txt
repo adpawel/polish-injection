@@ -4,3 +4,11 @@ agentdojo @ git+https://github.com/ethz-spylab/agentdojo.git@089ed468cf3ed0322ac
 
 # Validation of exported results against schemas/run_result.schema.json
 jsonschema==4.26.0
+
+# MCP track (mcp_track/): official MCP Python SDK (FastMCP servers, in-memory client sessions)
+mcp==1.12.4
+# mcp 1.12.4 imports pydantic internals removed in pydantic 2.12 (ImportError: eval_type_backport)
+pydantic==2.11.10
+
+# Charts of scripts/h6.py
+matplotlib==3.11.2

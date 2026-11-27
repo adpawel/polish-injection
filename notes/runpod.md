@@ -73,6 +73,23 @@ nohup vllm serve mistralai/Mistral-Nemo-Instruct-2407 --served-model-name mistra
 Native tool calling variant (used only for the comparison in models.md): add
 `--enable-auto-tool-choice --tool-call-parser mistral`.
 
+### Qwen3-8B (MCP track; native tool calling; not tested yet)
+
+nscale no longer serves Qwen3-8B (models.md), so the MCP track serves it here. Reasoning is switched off as in
+the IPI track, by `/no_think` at the end of the system prompt (`run_mcp_experiment.sh` adds it); `hermes` is the
+tool parser of the Qwen3 model card. Report as a deviation from protocol 1.1 (other serving than in the IPI track).
+
+```
+nohup vllm serve Qwen/Qwen3-8B --served-model-name qwen3-8b --enable-auto-tool-choice --tool-call-parser hermes --max-model-len 32768 --gpu-memory-utilization 0.92 --host 0.0.0.0 --port 8000 --api-key "$(cat /workspace/vllm_api_key)" > /workspace/vllm_qwen.log 2>&1 &
+```
+
+### Before the MCP runs of a model
+
+```
+.venv/Scripts/python.exe scripts/check_mcp_delivery.py <served-model-name>
+```
+must end with "all checks passed" (the poisoned descriptions and results reach the rendered prompt, protocol 3.4).
+
 ## Running AgentDojo against the pod (locally, Git Bash)
 
 ```

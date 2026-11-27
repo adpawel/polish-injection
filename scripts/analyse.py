@@ -17,6 +17,12 @@ Fully Polish environment (suite workspace_pl, notes/protocol.md 2.5): configurat
 environment, tools and system prompt Polish; payload PL or EN). Their comparisons with the main configurations
 are a separate family, Holm-corrected within a model; they do not change the main family.
 
+MCP track (notes/protocol.md 3): every table row and comparison is per vector (track shown as mcp/<vector>); the
+baseline without attack and the control are per track. Vector comparisons (3.5, H5): a pair is the same (user
+task, goal, configuration) under two vectors, used when exposed under both; McNemar and cluster bootstrap as
+above, Holm over the three vector pairs within (model, configuration). Exploratory: ASR per goal and per goal
+kind (side action / tampering), per vector.
+
 Usage: python scripts/analyse.py results.jsonl [results2.jsonl ...] [--bootstrap 2000] [--seed 0]
 """
 
@@ -24,6 +30,7 @@ import argparse
 import itertools
 import json
 import random
+import sys
 from collections import defaultdict
 from math import comb, sqrt
 from pathlib import Path
@@ -32,8 +39,14 @@ CONFIGS = ["EN/EN", "EN/PL", "PL/EN", "PL/PL"]
 PRIMARY = ("EN/EN", "PL/PL")
 # notes/protocol.md 2.5: fully Polish vs fully English, and the effect of the environment language
 ENV_COMPARISONS = [("EN/EN", "PLenv/PL"), ("PL/PL", "PLenv/PL"), ("PL/EN", "PLenv/EN"), ("PLenv/PL", "PLenv/EN")]
+VECTORS = ["tp_third_party", "mcp_result", "tp_trusted"]
 SAFE_RISK = {"none", "low"}
 MIN_DISCORDANT = 6
+
+
+def track_label(row: dict) -> str:
+    """Track, and for MCP attack runs the vector: ipi | mcp/<vector>."""
+    return f"mcp/{row['vector']}" if row["track"] == "mcp" and row.get("vector") else row["track"]
 
 
 def task_part(row: dict) -> str:
@@ -94,7 +107,7 @@ def describe(rows: list[dict]) -> None:
     for row in rows:
         key = (row["track"], row["model"])
         if row["run_type"] == "attack":
-            attack[key + (config(row),)].append(row)
+            attack[(track_label(row), row["model"], config(row))].append(row)
         elif row["run_type"] == "no_attack":
             no_attack[key + (task_part(row),)].append(row)
         else:
@@ -108,7 +121,7 @@ def describe(rows: list[dict]) -> None:
         successes = sum(r["attack_success_dedup"] for r in exposed)
         low, high = wilson(successes, len(exposed))
         safe = [r for r in runs if r["utility_risk"] in SAFE_RISK]
-        baseline = [r for r in no_attack.get((track, model, cfg.split("/")[0]), []) if r["utility_risk"] in SAFE_RISK]
+        baseline = [r for r in no_attack.get((track.split("/")[0], model, cfg.split("/")[0]), []) if r["utility_risk"] in SAFE_RISK]
         print(
             f"| {track} | {model} | {cfg} | {len(runs)} | {pct(len(exposed), len(runs))} | "
             f"{pct(successes, len(exposed))} [{low:.0%}, {high:.0%}] | {pct(sum(r['attack_success'] for r in runs), len(runs))} | "
@@ -127,7 +140,7 @@ def compare(rows: list[dict], resamples: int, seed: int) -> None:
     by_model = defaultdict(dict)
     for row in rows:
         if row["run_type"] == "attack":
-            by_model[(row["track"], row["model"])][(config(row), row["user_task"], row["injection_task"])] = row
+            by_model[(track_label(row), row["model"])][(config(row), row["user_task"], row["injection_task"])] = row
     rng = random.Random(seed)
     print("\n| track | model | comparison | exposed pairs | only A / only B | ASR A - B [95 % CI] | p | p (Holm) |")
     print("|---|---|---|---|---|---|---|---|")
@@ -160,6 +173,69 @@ def compare(rows: list[dict], resamples: int, seed: int) -> None:
             )
 
 
+def paired(rows_a: dict, rows_b: dict) -> list[tuple[str, bool, bool]]:
+    """(user task, success A, success B) for the keys exposed in both."""
+    return [(key[0], a["attack_success_dedup"], rows_b[key]["attack_success_dedup"])
+            for key, a in rows_a.items() if key in rows_b and a["exposed"] and rows_b[key]["exposed"]]
+
+
+def compare_vectors(rows: list[dict], resamples: int, seed: int) -> None:
+    cells = defaultdict(lambda: defaultdict(dict))  # (model, config) -> vector -> (user task, goal) -> row
+    for row in rows:
+        if row["track"] == "mcp" and row["run_type"] == "attack":
+            cells[(row["model"], config(row))][row["vector"]][(row["user_task"], row["injection_task"])] = row
+    if not cells:
+        return
+    rng = random.Random(seed)
+    print("\nMCP vectors (notes/protocol.md 3.5, H5)\n")
+    print("| model | config | comparison | exposed pairs | only A / only B | ASR A - B [95 % CI] | p | p (Holm) |")
+    print("|---|---|---|---|---|---|---|---|")
+    for (model, cfg), by_vector in sorted(cells.items()):
+        results = {}
+        for a, b in itertools.combinations(VECTORS, 2):
+            if a in by_vector and b in by_vector:
+                pairs = paired(by_vector[a], by_vector[b])
+                only_a = sum(x and not y for _, x, y in pairs)
+                only_b = sum(y and not x for _, x, y in pairs)
+                results[(a, b)] = (pairs, only_a, only_b, mcnemar_exact(only_a, only_b))
+        adjusted = holm({k: v[3] for k, v in results.items() if v[1] + v[2] >= MIN_DISCORDANT})
+        for (a, b), (pairs, only_a, only_b, p) in results.items():
+            if not pairs:
+                continue
+            diff = sum(x - y for _, x, y in pairs) / len(pairs)
+            low, high = bootstrap_diff(pairs, resamples, rng)
+            tested = only_a + only_b >= MIN_DISCORDANT
+            print(f"| {model} | {cfg} | {a} vs {b} | {len(pairs)} | {only_a} / {only_b} | "
+                  f"{diff:+.1%} [{low:+.1%}, {high:+.1%}] | {f'{p:.3g}' if tested else 'n/a'} | "
+                  f"{f'{adjusted[(a, b)]:.3g}' if tested else 'n/a'} |")
+
+
+def by_goal(rows: list[dict]) -> None:
+    """MCP, exploratory (3.5): dedup ASR on exposed runs per goal and per goal kind (side action / tampering)."""
+    mcp = [r for r in rows if r["track"] == "mcp" and r["run_type"] == "attack"]
+    if not mcp:
+        return
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from mcp_track.tasks import GOALS
+
+    cells = defaultdict(lambda: defaultdict(list))  # (model, config) -> (goal or kind, vector) -> exposed rows
+    for row in mcp:
+        if row["exposed"]:
+            goal = GOALS[row["injection_task"]]
+            for key in (goal.id, goal.kind):
+                cells[(row["model"], config(row))][(key, row["vector"])].append(row)
+    vectors = [v for v in VECTORS if any(r["vector"] == v for r in mcp)]
+    for (model, cfg), cell in sorted(cells.items()):
+        print(f"\nMCP by goal, {model} {cfg} (dedup ASR on exposed runs; exploratory):\n")
+        print("| goal | kind | " + " | ".join(vectors) + " |")
+        print("|---|---|" + "---|" * len(vectors))
+        for key in [*GOALS, "side", "tampering"]:
+            kind = GOALS[key].kind if key in GOALS else "**all**"
+            label = key if key in GOALS else f"**{key}**"
+            values = [pct(sum(r["attack_success_dedup"] for r in cell[(key, v)]), len(cell[(key, v)])) for v in vectors]
+            print(f"| {label} | {kind} | " + " | ".join(values) + " |")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("results", nargs="+", type=Path)
@@ -169,6 +245,8 @@ def main() -> None:
     rows = [json.loads(line) for path in args.results for line in path.read_text(encoding="utf-8").splitlines() if line]
     describe(rows)
     compare(rows, args.bootstrap, args.seed)
+    compare_vectors(rows, args.bootstrap, args.seed)
+    by_goal(rows)
 
 
 if __name__ == "__main__":

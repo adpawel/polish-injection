@@ -18,6 +18,13 @@ Only logs written with fix 11 of run_agentdojo.py (run metadata) are accepted, a
 (`harness_dirty: false`) unless --allow-dirty is given. Every row is validated against the schema; any invalid row
 stops the export.
 
+MCP track (suite mcp_shop, scripts/run_mcp.py): the logs already carry the scores computed on the world state
+(`utility`, `security`, `security_dedup`, `exposed`, `context_overflow`, `vector`, `payload_lang`); the utility risk
+comes from mcp_track/tasks.py. Control runs are the goals (`goal_*`) as user tasks. The attack success of the goals in
+RESCORED_MCP_GOALS is re-scored from the replay of the logged tool calls with the current checkers (changed after the
+runs, protocol "Changes" 2026-11-25); the replay reproduces the logged success of every MCP attack log with the
+checkers the runs were made with.
+
 Usage: python scripts/export_results.py <logdir> [<logdir> ...] -o results.jsonl [--allow-dirty]
 """
 
@@ -32,8 +39,15 @@ import jsonschema
 from attack_summary import replay_utility, summarise_run, text
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from mcp_track.replay import run_calls  # noqa: E402
+from mcp_track.tasks import GOALS as MCP_GOALS  # noqa: E402
+from mcp_track.tasks import USER_TASKS as MCP_TASKS  # noqa: E402
+
+MCP_SUITE = "mcp_shop"
 SCHEMA = json.loads((ROOT / "schemas" / "run_result.schema.json").read_text(encoding="utf-8"))
 RESCORED_UTILITY = {"workspace_pl"}  # suites whose utility comes from attack_summary.replay_utility
+RESCORED_MCP_GOALS = {"goal_11"}  # MCP goals whose attack success comes from mcp_security_replay
 UTILITY_RISK = json.loads((ROOT / "data" / "utility_risk.json").read_text(encoding="utf-8"))
 # suite -> the key of its tasks in data/utility_risk.json
 RISK_SUITE = {"workspace": "workspace", "workspace_pl": "workspace"}
@@ -50,12 +64,24 @@ SERVER = {
 def run_type(path: Path) -> str:
     if path.parent.name != "none":
         return "attack"
-    return "injection_as_user_task" if path.parent.parent.name.startswith("injection_task_") else "no_attack"
+    control = path.parent.parent.name.startswith(("injection_task_", "goal_"))
+    return "injection_as_user_task" if control else "no_attack"
 
 
 def timestamp(log: dict) -> str:
     local = datetime.datetime.strptime(log["evaluation_timestamp"], "%Y-%m-%d %H:%M:%S")
     return local.astimezone().isoformat()
+
+
+def mcp_security_replay(log: dict) -> tuple[bool, bool]:
+    """(raw, dedup) attack success of an MCP log, from its tool calls replayed on a fresh world (as scripts/run_mcp.py
+    scores dedup success)."""
+    calls = [(c["function"], dict(c["args"])) for m in log["messages"] if m["role"] == "assistant"
+             for c in (m.get("tool_calls") or [])]
+    goal = MCP_GOALS[log["injection_task_id"]]
+    pre, post, _ = run_calls(calls, log["env_lang"])
+    pre_d, post_d, _ = run_calls(calls, log["env_lang"], dedup_calls=True)
+    return goal.security(pre, post), goal.security(pre_d, post_d)
 
 
 def export_row(path: Path, allow_dirty: bool) -> dict | None:
@@ -64,16 +90,19 @@ def export_row(path: Path, allow_dirty: bool) -> dict | None:
         raise ValueError(f"{path}: no run metadata - written before fix 11 of run_agentdojo.py")
     if log["harness_dirty"] and not allow_dirty:
         raise ValueError(f"{path}: produced with uncommitted harness changes (use --allow-dirty for tests)")
-    if "security" not in log and "context_length_exceeded" not in (log.get("error") or ""):
+    mcp = log["suite_name"] == MCP_SUITE
+    if mcp and "utility" not in log:
+        raise ValueError(f"{path}: no `utility` - the run crashed; rerun it with -f")
+    if not mcp and "security" not in log and "context_length_exceeded" not in (log.get("error") or ""):
         raise ValueError(f"{path}: no `security` - the run crashed; rerun it with -f")
     kind = run_type(path)
-    if kind == "injection_as_user_task" and log["task_lang"] != "en" and log["suite_name"] != "workspace_pl":
+    if kind == "injection_as_user_task" and log["task_lang"] != "en" and log["suite_name"] not in ("workspace_pl", MCP_SUITE):
         return None
     messages = log["messages"]
     last = messages[-1] if messages else {}
     row = {
-        "schema_version": SCHEMA["properties"]["schema_version"]["const"],
-        "track": "ipi",
+        "schema_version": "1.1.0",
+        "track": "mcp" if mcp else "ipi",
         "run_type": kind,
         "model": log["model"],
         "task_lang": log["task_lang"],
@@ -82,6 +111,7 @@ def export_row(path: Path, allow_dirty: bool) -> dict | None:
         "user_task": log["user_task_id"],
         "injection_task": None,
         "attack": None,
+        "vector": None,
         "exposed": None,
         "attack_success": None,
         "attack_success_dedup": None,
@@ -111,6 +141,24 @@ def export_row(path: Path, allow_dirty: bool) -> dict | None:
             "server_version": SERVER.get(log["model"]),
         },
     }
+    if mcp:
+        if kind != "injection_as_user_task":
+            row["utility_risk"] = MCP_TASKS[log["user_task_id"]].risk
+        if kind == "attack":
+            security, security_dedup = log["security"], log["security_dedup"]
+            if log["injection_task_id"] in RESCORED_MCP_GOALS:
+                security, security_dedup = mcp_security_replay(log)
+            row.update(
+                payload_lang=log["payload_lang"],
+                injection_task=log["injection_task_id"],
+                attack=log["attack_type"],
+                vector=log["vector"],
+                exposed=log["exposed"],
+                attack_success=security,
+                attack_success_dedup=security_dedup,
+            )
+        row["context_overflow"] = log["context_overflow"]
+        return row
     if kind != "injection_as_user_task":
         row["utility_risk"] = UTILITY_RISK[RISK_SUITE[log["suite_name"]]][log["user_task_id"]][0]
     if kind == "attack":
@@ -121,6 +169,7 @@ def export_row(path: Path, allow_dirty: bool) -> dict | None:
             payload_lang=PAYLOAD_LANG[log["attack_type"]],
             injection_task=log["injection_task_id"],
             attack=log["attack_type"],
+            vector="ipi_data",
             exposed=run["exposed"],
             attack_success=run["attack_success"],
             attack_success_dedup=run["attack_success_dedup"],
